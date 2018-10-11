@@ -21,4 +21,7 @@ typedef struct{
 
 ms_game new_game(int rand_seed);
 
+void flag_tile(ms_game *game, int x, int y);
+void reveal_tile(ms_game *game, int x, int y);
+
 #endif /* MS_H_ */

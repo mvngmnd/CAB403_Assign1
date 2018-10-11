@@ -11,8 +11,8 @@ void remove_bomb(ms_game *game, int x, int y){
     game->board[x][y].bomb = false;
     for (int i=x-1;i<=x+1;i++){
         for (int j=y-1;j<=y+1;j++){
-            if (!(i==x && j==y)&&(game->board[i][j].bomb == false)){ /* If not the bomb itself, or any other bomb */
-                if (i>=0 && i<MS_COLS && j>=0 && j<MS_ROWS){        /* If not outside the board */
+            if (!(i==x && j==y)&&(game->board[i][j].bomb == false)){  /* If not the bomb itself, or any other bomb */
+                if (i>=0 && i<MS_COLS && j>=0 && j<MS_ROWS){          /* If not outside the board */
                     game->board[i][j].adjacent--;
                 }
             }
@@ -22,6 +22,8 @@ void remove_bomb(ms_game *game, int x, int y){
 }
 
 bool place_bomb(ms_game *game, int x, int y){
+
+    /* If there is already a bomb at location */
 	if (game->board[x][y].bomb){
         return false;
     }
@@ -51,13 +53,11 @@ void flag_tile(ms_game *game, int x, int y){
 void reveal_tile(ms_game *game, int x, int y){
 
 	if (game->board[x][y].bomb) {
-        /* Results it in being impossible for a bomb to be hit on first go */
-        if (game->first_turn){
+        if (game->first_turn){                    /* Impossible for a bomb to be hit on first go */
             remove_bomb(game,x,y);
             for (int j = 0;j<MS_ROWS;j++){
                 for (int i=0;i<MS_COLS;i++){
-                    /* Places the bomb at first possible x location */
-                    if (place_bomb(&game,i,j)){
+                    if (place_bomb(game,i,j)){   /* Places the bomb at first possible x location */
                         reveal_tile(game,x,y);
                         game->first_turn = false;
                         return;
@@ -66,7 +66,7 @@ void reveal_tile(ms_game *game, int x, int y){
             }
         }
 
-    } else if (game->board[x][y].adjacent == 0){
+    } else if (game->board[x][y].adjacent == 0){  /* If blank spot chosen, reveal all nearby blank spots */
         for (int i = x-1; i<=x+1; i++){
             for (int j = y-1; j<=y+1; j++){
                     if (i>=0 && j>=0 && i<MS_COLS && j<MS_ROWS){
@@ -81,9 +81,11 @@ void reveal_tile(ms_game *game, int x, int y){
     } else {
         game->board[x][y].revealed = true;
     }
+
     if (game->first_turn){
         game->first_turn = false;
     }
+    
 }
 
 ms_game new_game(int seed){

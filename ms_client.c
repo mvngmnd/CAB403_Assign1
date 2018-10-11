@@ -25,7 +25,6 @@ int socket_fd;
 
 //TODO: Waiting for spot in queue.....
 //Maybe even have current number in queue, IE numreq-queuesize
-//TODO: Get rid of all macros
 
 void recieve_game(int socket_fd);
 
@@ -66,16 +65,16 @@ int main(int argc, char* argv[]){
     server_addr.sin_port = htons(atoi(argv[2]));
     bzero(&server_addr.sin_zero,sizeof(server_addr.sin_zero));
 
-    bool connected = true;
-
     clear_screen();
     welcome_screen();
 
     /* Client requests connection to server */
-    if (connect(socket_fd, (struct sockaddr *)&server_addr, sizeof(struct sockaddr_in)) == ERROR) {
-		perror("Wrong server details or server is offline!");
+    if (connect(socket_fd, (struct sockaddr *) &server_addr, sizeof(struct sockaddr_in)) == ERROR) {
+		perror("Wrong server details or server is offline! Please try again.");
 		exit(1);
 	}
+
+    bool connected = true;
 
     verify_user(socket_fd);
 

@@ -7,7 +7,7 @@
 #########################################################
 
 CC = gcc
-CFLAGS = -w
+CFLAGS = -Wall
 
 all: server client
 	rm -f *.o

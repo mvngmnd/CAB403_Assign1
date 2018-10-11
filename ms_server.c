@@ -58,7 +58,7 @@ void send_game(int socket_fd, ms_game game);
 ms_coord_req receive_user_request(int socket_fd);
 
 void add_conn_request(int socket_fd, ms_user user);
-struct request* get_conn_request();
+conn_request* get_conn_request();
 void handle_conn_request(conn_request request);
 void handle_conn_requests_loop(void* data);
 
@@ -126,7 +126,7 @@ int main(int argc, char* argv[]){
     /* Create threads */
     for (i=0;i<QUEUE_SIZE;i++){
         thread_ids[i] = i;
-        pthread_create(&p_threads[i], &attr, handle_conn_requests_loop, &thread_ids[i]);
+        pthread_create(&p_threads[i], &attr, (void*) handle_conn_requests_loop, &thread_ids[i]);
     }
 
     while(true){
@@ -249,7 +249,7 @@ void add_conn_request(int socket_fd, ms_user user){
     pthread_cond_signal(&requests_outstanding);
 }
 
-struct request* get_conn_request(){
+conn_request* get_conn_request(){
 
     conn_request* request;
 
@@ -262,7 +262,7 @@ struct request* get_conn_request(){
 
         /* Was the last request of the list */
         if (conn_requests == NULL){
-            last_conn_request == NULL;
+            last_conn_request = NULL;
         }
 
         conn_request_num--;
@@ -312,7 +312,6 @@ void handle_conn_request(conn_request request){
     int socket_fd = request.socket_fd;
 
     bool game_in_progress = true;
-    bool game_init = false;
 
     game = new_game(rand());
 

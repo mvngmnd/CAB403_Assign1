@@ -1,5 +1,6 @@
 #include "utils.h"
 #include <stdio.h>
+#include <stdlib.h>
 
 void clear_screen(){
     system("@cls||clear");

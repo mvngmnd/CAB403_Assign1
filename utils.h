@@ -12,7 +12,7 @@
 #define ACCEPTED 1
 #define REJECTED -1
 
-/* sys/socket.h doesnt contain def */
+/* No sys/socket.h definition */
 #define NO_FLAGS 0
 
 /* Max lengths for user struct fields */
@@ -48,24 +48,24 @@ typedef struct{
 	request_type type;
 } ms_coord_req;
 
-/******************************************************************/
-/* func: Clears the screen.
-/******************************************************************/
+/******************************************************************
+* func: Clears the screen.
+******************************************************************/
 void clear_screen();
 
-/******************************************************************/
-/* func: Prints the current state of the game to the screeen
-/* param cols: The width of the array to be passed
-/* param rows: The length of the array to be passed
-/* param game: An array containing a numerical representation of a
-/*      game board state.
-/******************************************************************/
+/******************************************************************
+* func:       Prints the current state of the game to the screeen
+* param cols: The columns/width of the array to be passed
+* param rows: The rows/length of the array to be passed
+* param game: An array containing a numerical representation of a
+*             game board state.
+******************************************************************/
 void print_game(int cols, int rows, int game[cols][rows]);
 
-/******************************************************************/
-/* func: Draws a line on screen of a specified length
-/* param Length: The desired length of the line, in numerical format
-/******************************************************************/
+/******************************************************************
+* func:         Draws a line on screen of a specified length
+* param Length: The desired length of the line, in numerical format
+******************************************************************/
 void print_line(int length);
 
 #endif /* UTILS_H_ */
