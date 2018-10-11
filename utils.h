@@ -27,12 +27,17 @@
 #define BOMB_CHAR "\u06DE"
 #define BOMB_VAL 12
 
+/* Enum's for easier communication */
 typedef enum{
     game_board,
     leaderboard,
     flag,
     reveal,
-    quit
+    quit,
+    won,
+    lost,
+    invalid,
+    okay
 } request_type;
 
 /* A struct used to represent a user */

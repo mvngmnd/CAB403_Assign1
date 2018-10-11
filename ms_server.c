@@ -14,10 +14,6 @@
 #include "ms.h"
 #include "utils.h"
 
-//If we can do reverse to get ip from sock addr, can have "IPADDRESS is now playing in lobby threadid+1"
-
-//validate user
-
 /* macOS has different mutex initializers */
 #ifdef __APPLE__
 pthread_mutex_t request_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
@@ -38,7 +34,7 @@ struct conn_request{
     conn_request* next;
 };
 conn_request* conn_requests = NULL;
-conn_request* last_conn_request = NULL;
+conn_request* conn_requests_last = NULL;
 int conn_request_num = 0;
 
 /* Struct of a single scoreboard entry */
@@ -48,10 +44,13 @@ struct scoreboard_entry{
     ms_user user;
     scoreboard_entry* next;
 };
-scoreboard_entry* scoreboard_list;
+scoreboard_entry* scoreboard_list = NULL;
+scoreboard_entry* scoreboard_list_last = NULL;
 
 int verify_user(ms_user user);
 void exit_gracefully();
+
+void send_response(int socket_fd, int response);
 
 void send_game(int socket_fd, ms_game game);
 
@@ -59,12 +58,12 @@ ms_coord_req receive_user_request(int socket_fd);
 
 void add_conn_request(int socket_fd, ms_user user);
 conn_request* get_conn_request();
-void handle_conn_request(conn_request request);
+void handle_conn_request(conn_request conn_request);
 void handle_conn_requests_loop(void* data);
 
 int main(int argc, char* argv[]){
 
-    signal(SIGINT, exit_gracefully);
+    //signal(SIGINT, exit_gracefully);
     signal(SIGPIPE, SIG_IGN); //TODO: This dont work
     srand(42);
 
@@ -177,7 +176,6 @@ int main(int argc, char* argv[]){
 }
 
 void send_game(int socket_fd, ms_game game){
-    #define game(x,y) game.board[x][y]
 
     int cols = MS_COLS;
     int rows = MS_ROWS;
@@ -195,13 +193,13 @@ void send_game(int socket_fd, ms_game game){
 
     for (y=0;y<rows;y++){
         for (x=0;x<cols;x++){
-            if (game(x,y).flagged){
+            if (game.board[x][y].flagged){
                 value = htons(FLAG_VAL);
-            } else if (game(x,y).revealed){
-                if (game(x,y).bomb){
+            } else if (game.board[x][y].revealed){
+                if (game.board[x][y].bomb){
                     value = htons(BOMB_VAL);
                 } else {
-                    value = htons(game(x,y).adjacent);
+                    value = htons(game.board[x][y].adjacent);
                 }
             } else {
                 value = htons(UNSELECTED_VAL);
@@ -220,7 +218,7 @@ void add_conn_request(int socket_fd, ms_user user){
 
     request = (conn_request*)malloc(sizeof(conn_request));
     if (!request){
-        //TODO:error("System has run out of memory");
+        perror("System has run out of memory");
         return;
     }
 
@@ -233,10 +231,10 @@ void add_conn_request(int socket_fd, ms_user user){
 
     if (conn_request_num == 0){
         conn_requests = request;
-        last_conn_request = request;
+        conn_requests_last = request;
     } else {
-        last_conn_request->next = request;
-        last_conn_request = request;
+        conn_requests_last->next = request;
+        conn_requests_last = request;
     }
 
 
@@ -260,9 +258,9 @@ conn_request* get_conn_request(){
         request = conn_requests;
         conn_requests = conn_requests->next;
 
-        /* Was the last request of the list */
+        /* The request was the last of the list */
         if (conn_requests == NULL){
-            last_conn_request = NULL;
+            conn_requests_last = NULL;
         }
 
         conn_request_num--;
@@ -289,11 +287,10 @@ void handle_conn_requests_loop(void* data){
         if (conn_request_num > 0){
             request = get_conn_request();
 
-            printf("%s now playing in Game Room #%d\n", request->user.username, thread_id+1);
-            fflush(0);
-
             if (request){
                 pthread_mutex_unlock(&request_mutex);
+                printf("%s now playing in Game Room #%d\n", request->user.username, thread_id+1);
+                fflush(0);
                 handle_conn_request(*request);
                 free(request);
                 pthread_mutex_lock(&request_mutex);
@@ -305,30 +302,44 @@ void handle_conn_requests_loop(void* data){
 
 }
 
-void handle_conn_request(conn_request request){
+void handle_conn_request(conn_request conn_request){
 
     /* User information for this session */
-    ms_game game;
-    int socket_fd = request.socket_fd;
+    ms_game game = new_game(rand());
 
-    bool game_in_progress = true;
+    bool connected = true;
 
-    game = new_game(rand());
-
-    while (game_in_progress){
-        ms_coord_req request = receive_user_request(socket_fd);
+    while (connected){
+        ms_coord_req request = receive_user_request(conn_request.socket_fd);
         switch (request.type){
             case reveal:
-                reveal_tile(&game,request.x,request.y);
-                break;
+                if (location_is_bomb(&game,request.x,request.y) && game.first_turn == false){
+                    send_response(conn_request.socket_fd,lost);
+                    reveal_board(&game);
+                    send_game(conn_request.socket_fd,game);
+                    game = new_game(rand());
+                    break;
+                } else {
+                    if (check_win(&game)){
+                        send_response(conn_request.socket_fd,won);
+                    } else {
+                        send_response(conn_request.socket_fd,okay);
+                    }
+                    reveal_tile(&game,request.x,request.y);
+                    break;
+                }
             case flag:
                 flag_tile(&game, request.x, request.y);
+                send_response(conn_request.socket_fd,okay);
                 break;
             case game_board:
-                send_game(socket_fd, game);
+                send_game(conn_request.socket_fd, game);
                 break;
             case leaderboard:
                 break;
+            default:
+                break;
+
         }
     }
 }
@@ -341,11 +352,36 @@ ms_coord_req receive_user_request(int socket_fd){
     return request;
 }
 
+void send_response(int socket_fd, int response){
+    if(send(socket_fd, &response, sizeof(int),PF_UNSPEC) == ERROR){
+        perror("Sending reveal response");
+    }
+}
+
 int verify_user(ms_user user){
-    //TODO:FILE CHECK
+    FILE *ptr_file;
+    char buf[256];
+    ptr_file = fopen("Authentication.txt","r");
+
+    if (!ptr_file){
+        return -1;
+    }
+
+    int x = 0;
+
+    while (fgets(buf,1000, ptr_file)!=NULL){
+        if (x==0){
+            x++;
+        } else {
+            printf("%s",buf);
+        }
+    }
+
+	fclose(ptr_file);
     return 1;
 }
 
-void exit_gracefully(){
-    //TODO: Exit gracefully
+void exit_gracefully(int socket_fd){
+    shutdown(socket_fd, SHUT_RDWR);
+    close(socket_fd);
 }

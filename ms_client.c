@@ -21,6 +21,7 @@ typedef enum {
 /* A struct representing the current user */
 ms_user session_user;
 
+/* Users socket connection to server */
 int socket_fd;
 
 //TODO: Waiting for spot in queue.....
@@ -96,9 +97,6 @@ int main(int argc, char* argv[]){
                 ingame = true;
                 while (ingame){
 
-                    signal(SIGPIPE, SIG_IGN); //TODO: This dont work
-                    
-
                     recieve_game(socket_fd);
 
                     if (game_menu_choice == 0){
@@ -114,8 +112,8 @@ int main(int argc, char* argv[]){
                             
                             scanf("%d,%d", &request.x, &request.y);
                             request.type = reveal;
-                            request.x--;
-                            request.y--;
+                            request.x--; /* Convert to index from 0 */
+                            request.y--; /* Convert to index from 0 */
                             send_request(socket_fd, request);
                             break;
                         case 2:
@@ -125,6 +123,26 @@ int main(int argc, char* argv[]){
                             continue;
                         default:
                             printf("Invalid choice...\n");
+                    }
+
+                    int response;
+                    if (recv(socket_fd,&response,sizeof(int),PF_UNSPEC)==ERROR){
+                        perror("Receiving request response");
+                    } 
+                    
+                    switch (response){
+                        case okay:
+                            break;
+                        case lost:
+                            recieve_game(socket_fd);
+                            printf("You've hit a bomb! Game over...\n");
+                            ingame = false;
+                            break;
+                        case won:
+                            recieve_game(socket_fd);
+                            printf("You've found all the bombs! You've won!\n");
+                            ingame = false;
+                            break;
                     }
                 }
                 break;
