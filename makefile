@@ -1,9 +1,9 @@
 
 #########################################################
-# Makefile for CAB403 Systems Programming Project	#
-# Author: Marcus van Egmond (n9937439)			#
-#							#
-# Produces: ./client & ./server				#
+# Makefile for CAB403 Systems Programming Project	
+# Author: Marcus van Egmond (n9937439)			
+#							
+# Produces: ./client & ./server				
 #########################################################
 
 CC = gcc
