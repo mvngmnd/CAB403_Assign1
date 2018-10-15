@@ -1,18 +1,19 @@
-#include "utils.h"
 #include <stdio.h>
 #include <stdlib.h>
+
+#include "utils.h"
 
 void clear_screen(){
     system("@cls||clear");
 }
 
-void print_game(int cols, int rows, int game[cols][rows]){
-
-    printf("\n");
+void print_game(int cols, int rows, int board[cols][rows]){
 
     int x,y;
 
-    /* If more than ten columns, have base-10 indicies */
+    printf("\n");
+
+    /* If more than 10 columns, print base-10 indicies on top */
     if (cols>=10){
         for (x=1;x<=cols;x++){
             if (!x%10==0){
@@ -24,13 +25,13 @@ void print_game(int cols, int rows, int game[cols][rows]){
         printf("\n");
     }
 
-    /* Print x axis */
+    /* Print x axis coordinates */
     printf("  ");
     for (x=1;x<=cols;x++){
         printf("|%d",x%10);
     }
 
-    /* Print ------- */
+    /* Print dividing line ----- */
     printf("\n");
     for (x=0;x<=cols;x++){
         printf("--");
@@ -39,9 +40,11 @@ void print_game(int cols, int rows, int game[cols][rows]){
 
     /* Print y axis */
     for (y=0;y<rows;y++){
+        /* Print y axis coordinates */
         printf("%d| ",y+1);
         for (x=0;x<cols;x++){
-            switch(game[x][y]){
+            /* Print y axis tile values */
+            switch(board[x][y]){
                 case BOMB_VAL:
                     printf("%s ", BOMB_CHAR);
                     break;
@@ -52,24 +55,27 @@ void print_game(int cols, int rows, int game[cols][rows]){
                     printf("%s ", UNSELECTED_CHAR);
                     break;
                 default:
-                    if (game[x][y]>0){
-                        printf("%d ", game[x][y]);
+                    if (board[x][y]>0){
+                        printf("%d ", board[x][y]);
                         break;
                     } else {
                         printf("  ");
                         break;
                     }
-                    
             }
         }
         printf("\n");
     }
-    printf("\n");
 }
 
 void print_line(int length){
-    for (int i = 0;i<length;i++){
+
+    int i;
+
+    for (i=0;i<length;i++){
         printf("=");
     }
+
     printf("\n");
+
 }

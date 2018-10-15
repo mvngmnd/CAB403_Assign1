@@ -1,64 +1,32 @@
-#include "ms.h"
 
 #include <stdbool.h>
-#include <stdlib.h> 
-#include <stdio.h> 
-#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
 
-bool location_is_bomb(ms_game *game, int x, int y){
+#include "ms.h"
+
+bool location_bomb(ms_game_t *game, int x, int y){
     return (game->board[x][y].bomb);
 }
 
-bool location_is_revealed(ms_game *game, int x, int y){
-    return (game->board[x][y].revealed);
-}
-
-bool location_is_valid(ms_game *game, int x, int y){
+bool location_valid(ms_game_t *game, int x, int y){
     /* Determine that the location is on the board */
     return (x>= 0 && y>=0 && x<MS_COLS && y<MS_ROWS);
 }
 
-void reveal_board(ms_game *game){
-    int x, y;
-    for (y=0;y<MS_ROWS;y++){
-        for(x=0;x<MS_COLS;x++){
-            game->board[x][y].revealed = true;
-        }
-    }
+bool location_revealed(ms_game_t *game, int x, int y){
+    return (game->board[x][y].revealed);
 }
 
-void remove_bomb(ms_game *game, int x, int y){
-    int xi,yi;
-
-    game->board[x][y].bomb = false;
-    for (xi=x-1;xi<=x+1;xi++){
-        for (yi=y-1;yi<=y+1;yi++){
-            if (location_is_valid(game, xi, yi)){
-                if (!(xi==x && yi==y)&&!location_is_bomb(game,xi,yi)){  /* If not the bomb itself, or any other bomb */
-                    game->board[xi][yi].adjacent--;
-                }
-            }
-        }
-    }
-
+bool location_flagged(ms_game_t *game, int x, int y){
+    return game->board[x][y].flagged;
 }
 
-bool check_win(ms_game *game){
-    int x,y;
-    bool won = true;
-    
-    /* Check if all non-bombs have been revealed */
-    for (y=0;y<MS_ROWS;y++){
-        for (x=0;x<MS_COLS;x++){
-            if (!location_is_bomb(game,x,y) && !game->board[x][y].revealed){
-                won = false;
-            }
-        }
-    }
-    return won;
+void flag_tile(ms_game_t *game, int x, int y){
+    game->board[x][y].flagged = !game->board[x][y].flagged;
 }
 
-bool place_bomb(ms_game *game, int x, int y){
+bool place_bomb(ms_game_t *game, int x, int y){
 
     /* If there is already a bomb at location */
 	if (game->board[x][y].bomb){
@@ -83,13 +51,34 @@ bool place_bomb(ms_game *game, int x, int y){
 
 }
 
-void flag_tile(ms_game *game, int x, int y){
-    game->board[x][y].flagged = !game->board[x][y].flagged;
+void remove_bomb(ms_game_t *game, int x, int y){
+    int xi,yi;
+
+    game->board[x][y].bomb = false;
+    for (xi=x-1;xi<=x+1;xi++){
+        for (yi=y-1;yi<=y+1;yi++){
+            if (location_valid(game, xi, yi)){
+                if (!(xi==x && yi==y)&&!location_bomb(game,xi,yi)){  /* If not the bomb itself, or any other bomb */
+                    game->board[xi][yi].adjacent--;
+                }
+            }
+        }
+    }
+
 }
 
-void reveal_tile(ms_game *game, int x, int y){
+void reveal_board(ms_game_t *game){
+    int x, y;
+    for (y=0;y<MS_ROWS;y++){
+        for(x=0;x<MS_COLS;x++){
+            game->board[x][y].revealed = true;
+        }
+    }
+}
 
-	if (location_is_bomb(game,x,y)) {
+void reveal_tile(ms_game_t *game, int x, int y){
+    
+	if (location_bomb(game,x,y)) {
         if (game->first_turn){                   /* Impossible for a bomb to be hit on first go */
             remove_bomb(game,x,y);
             for (int j = 0;j<MS_ROWS;j++){
@@ -103,7 +92,7 @@ void reveal_tile(ms_game *game, int x, int y){
             }
         }
         
-        reveal_board(game); // ADD LOSE FUNCTIONALITY
+        reveal_board(game); //TODO: ADD LOSE FUNCTIONALITY, have this func return req_t
 
     } else if (game->board[x][y].adjacent == 0){  /* If blank spot chosen, reveal all nearby blank spots */
         for (int i = x-1; i<=x+1; i++){
@@ -127,16 +116,15 @@ void reveal_tile(ms_game *game, int x, int y){
     
 }
 
-ms_game new_game(int seed){
+ms_game_t new_game(int rand_seed){
+    ms_game_t game;
+    srand(rand_seed);
 
-	ms_game game;
-	
-	int i, x, y;
+    int i,x,y;
 
-	srand(seed);
-	game.first_turn = true;
+    game.first_turn = true;
 
-	/* Initialize array */
+    /* Initialize array */
 	for (y=0;y<MS_ROWS;y++){
 		for (x=0;x<MS_COLS;x++){
 			game.board[x][y].adjacent = 0;
@@ -146,8 +134,8 @@ ms_game new_game(int seed){
 		}
 	}
 
-	/* Place bombs */
-	for (i=0;i<MS_BOMBNO;i++){
+    /* Place bombs */
+	for (i=0;i<MS_BOMBS;i++){
 		do{
 			x = rand() % MS_COLS;
 			y = rand() % MS_ROWS;
@@ -155,5 +143,4 @@ ms_game new_game(int seed){
 	}
     
     return game;
-
 }

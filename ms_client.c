@@ -1,47 +1,39 @@
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <netdb.h>
+
 #include <stdbool.h>
-#include <strings.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <sys/socket.h> 
+#include <stdio.h>
+
 #include <unistd.h>
 
-#include <signal.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <sys/socket.h> 
 
 #include "utils.h"
 
-/* Enum for menu types */
-typedef enum {
-    main_menu,
-    game_menu
-} menu_type;
+#include <strings.h> //TODO: Remove, with bzero in connect_to_server
 
-/* A struct representing the current user */
-ms_user session_user;
-
-/* Users socket connection to server */
+/* Users connection point to server */
 int socket_fd;
 
-//TODO: Waiting for spot in queue.....
-//Maybe even have current number in queue, IE numreq-queuesize
+/* The current user */
+ms_user session_user;
 
-void recieve_game(int socket_fd);
-
-void exit_gracefully();
-void print_menu(menu_type menu_type);
-void send_request(int socket_fd, ms_coord_req request);
-void show_leaderboard();
+/* Function definitions */
+void connect_to_server(char* argv[]);
+int get_menu_choice();
+void print_menu(menu_t menu_type);
+void recieve_game();
+req_t send_request(coord_req_t request);
 void verify_user();
+coord_req_t get_coords();
 void welcome_screen();
+void ms_process();
+
+void game_sig(int* menu_choice);
 
 int main(int argc, char* argv[]){
-
-    signal(SIGINT, exit_gracefully);
-
-    struct hostent *host;
-    struct sockaddr_in server_addr;
 
     /* If incorrect program usage */
     if (argc != 3){
@@ -49,137 +41,195 @@ int main(int argc, char* argv[]){
         exit(EXIT_FAILURE);
     }
 
-    /* Get host info TODO: This is deprecated? */
-    if ((host = gethostbyname(argv[1])) == NULL){
-        herror("Host name");
-        exit(EXIT_FAILURE);
+    clear_screen();
+
+    welcome_screen();
+    connect_to_server(argv);
+    verify_user();
+
+    int main_menu_choice = 0;
+
+    while (true){
+        print_menu(main_menu);
+        main_menu_choice = get_menu_choice();
+
+        switch(main_menu_choice){
+            /* Play Minesweeper */
+            case 1:
+                ms_process();
+                break;
+            /* Show Leaderboard */
+            case 2:
+
+                break;
+            /* Quit */
+            case 3:
+
+                break;
+        }
     }
 
+    return 0;
+}
+
+void connect_to_server(char* argv[]){
+
+    struct hostent *host;
+    struct sockaddr_in server_addr;
+
+    /* Get host info */
+    if ((host = gethostbyname(argv[1])) == NULL){
+        herror("Host name translation.");
+        exit(EXIT_FAILURE);
+    }
     /* Create socket */
-    if ((socket_fd = socket(AF_INET,SOCK_STREAM, PF_UNSPEC)) == ERROR){ 
+    if ((socket_fd = socket(AF_INET, SOCK_STREAM, PF_UNSPEC)) == ERROR){
         perror("Creating socket");
         exit(EXIT_FAILURE);
-    } 
+    }
 
     server_addr.sin_addr = *(struct in_addr *)host->h_addr;
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(atoi(argv[2]));
+    //TODO: Below is deprecated
     bzero(&server_addr.sin_zero,sizeof(server_addr.sin_zero));
 
-    clear_screen();
-    welcome_screen();
+    if (connect(socket_fd, (struct sockaddr *) &server_addr, sizeof(struct sockaddr_in)) == ERROR){
+        perror("Wrong server details or server is offline! Please try again.");
+        exit(EXIT_FAILURE);
+    }
 
-    /* Client requests connection to server */
-    if (connect(socket_fd, (struct sockaddr *) &server_addr, sizeof(struct sockaddr_in)) == ERROR) {
-		perror("Wrong server details or server is offline! Please try again.");
-		exit(1);
-	}
+}
 
-    bool connected = true;
+void game_sig(int *choice){
+    choice = 0;
+}
 
-    verify_user(socket_fd);
+void ms_process(){
+    
+    int game_menu_choice = 0;
+    bool ingame = true;
 
-    while (connected){
+    coord_req_t request;
+    req_t response = valid;
 
-        print_menu(main_menu);
-        printf("   --> ");
-        int main_menu_choice = 0;
-        scanf("%d", &main_menu_choice);
+    while (ingame){
 
-        bool ingame = false;
-        int game_menu_choice = 0;
+        if (response == valid){
+            clear_screen();
+            recieve_game();
+        } else {
+            printf("\nInvalid choice...\n");
+        }
 
-        ms_coord_req request;
-       
-        switch(main_menu_choice){
+        if (game_menu_choice == 0){
+            print_menu(game_menu);
+            game_menu_choice = get_menu_choice();
+        } else {
+            switch (game_menu_choice){
+                case 1:
+                    printf("\n   --> Currently in reveal mode");
+                    break;
+                case 2:
+                    printf("\n   --> Currently in flag mode");
+                    break;
+            }
+            
+        }
+        printf("\n 0 --> Change mode\n");
 
+        switch (game_menu_choice){
+            request.x = -1; /* Reset request state */
+            request.y = -1; /* Reset request state */
+            /* Place tile */
             case 1:
-                ingame = true;
-                while (ingame){
-
-                    recieve_game(socket_fd);
-
-                    if (game_menu_choice == 0){
-                        print_menu(game_menu);
-                        printf("   --> ");
-                        scanf("%d",&game_menu_choice);
-                    }
-
-                    switch(game_menu_choice){
-                        case 1:
-                            printf("\nESC--> Change Mode\n");
-                            printf("X,Y--> ");
-                            
-                            scanf("%d,%d", &request.x, &request.y);
-                            request.type = reveal;
-                            request.x--; /* Convert to index from 0 */
-                            request.y--; /* Convert to index from 0 */
-                            send_request(socket_fd, request);
-                            break;
-                        case 2:
-                            break;
-                        case 3:
-                            ingame = false;
-                            continue;
-                        default:
-                            printf("Invalid choice...\n");
-                    }
-
-                    int response;
-                    if (recv(socket_fd,&response,sizeof(int),PF_UNSPEC)==ERROR){
-                        perror("Receiving request response");
-                    } 
-                    
-                    switch (response){
-                        case okay:
-                            break;
-                        case lost:
-                            recieve_game(socket_fd);
-                            printf("You've hit a bomb! Game over...\n");
-                            ingame = false;
-                            break;
-                        case won:
-                            recieve_game(socket_fd);
-                            printf("You've found all the bombs! You've won!\n");
-                            ingame = false;
-                            break;
-                    }
+                request = get_coords();
+                if (request.x < 0){
+                    request.y = -1;
+                    game_menu_choice = 0;
+                    response = valid;
+                    break;
                 }
+                request.request_type = reveal;
+                response = send_request(request);
                 break;
+            /* Place flag */
             case 2:
-                show_leaderboard();
+                request = get_coords();
+                if (request.x < 0){
+                    request.y = -1;
+                    game_menu_choice = 0;
+                    response = valid;
+                    break;
+                }
+                request.request_type = flag;
+                response = send_request(request);
                 break;
+            /* Exit */
             case 3:
-                exit_gracefully();
-                break;
+                ingame = false;
+                coord_req_t quit;
+                quit.request_type = lost;
+                response = send_request(quit);
+                ingame = false;
+                return;
             default:
                 printf("Invalid choice...\n");
+                game_menu_choice = 0;
+                break;
         }
     }
-    
-    exit_gracefully();
-    return 0;
+
 }
 
-void exit_gracefully(){
-    shutdown(socket_fd,SHUT_RD);
-    close(socket_fd);
-    printf("\nThanks for playing!\n\n");
-    fflush(0);
-    exit(0);
+int get_menu_choice(){
+        char* val = malloc(sizeof(char));
+        printf("   --> ");
+        scanf("%s", val);
+        int value = atoi(&val[0]);
+        return value;
 }
 
-void recieve_game(int socket_fd){
-    
+coord_req_t get_coords(){
+        //TODO: take x and y individually
+        coord_req_t coord_req;
+        printf("X,Y--> ");
+        scanf("%d,%d", &coord_req.x, &coord_req.y);
+        coord_req.x--;
+        coord_req.y--;
+        return coord_req;
+}
+
+void print_menu(menu_t menu_type){
+
+        printf("\n");
+        switch (menu_type){
+        case main_menu:
+            printf("Choose an option to proceed:\n");
+            printf(" 1 --> Play Minesweeper\n");
+            printf(" 2 --> Show leaderboard\n");
+            printf(" 3 --> Quit\n");
+            break;
+        case game_menu:
+            printf("Select a keyboard mode:\n");
+            printf(" 1 --> Reveal a tile\n");
+            printf(" 2 --> Place a flag\n");
+            printf(" 3 --> Quit\n");
+            break;
+    }
+
+}
+
+void recieve_game(){
     int x,y;
     int cols, rows;
 
     uint16_t value;
 
-    ms_coord_req request;
-    request.type = game_board;
+    coord_req_t request;
+    request.request_type = gameboard;
 
-    if (send(socket_fd,&request, sizeof(ms_coord_req), PF_UNSPEC) == ERROR){
+    if (send(socket_fd,&request, sizeof(coord_req_t), PF_UNSPEC) == ERROR){
         perror("Sending game query");
     }
 
@@ -205,63 +255,52 @@ void recieve_game(int socket_fd){
     print_game(cols, rows, values);
 }
 
-void send_request(int socket_fd, ms_coord_req request){
-    if (send(socket_fd, &request, sizeof(ms_coord_req), PF_UNSPEC) == ERROR){
-        perror("Sending user coord request");
-    }
-}
+req_t send_request(coord_req_t request){
 
-void show_leaderboard(){
-    //TODO:
-}
-
-void print_menu(menu_type menu_type){
-    printf("\n");
-    switch(menu_type){
-        case main_menu:
-            printf("Choose an option to proceed:\n");
-            printf(" 1 --> Play Minesweeper\n");
-            printf(" 2 --> Show leaderboard\n");
-            printf(" 3 --> Quit\n");
-            break;
-        case game_menu:
-            printf("Select a keyboard mode:\n");
-            printf(" 1 --> Reveal a tile\n");
-            printf(" 2 --> Place a flag\n");
-            printf(" 3 --> Quit\n");
-            break;
+    if (send(socket_fd, &request, sizeof(coord_req_t), PF_UNSPEC) == ERROR){
+        perror("Sending coordinate request");
     }
 
+    req_t response;
+    if (recv(socket_fd, &response, sizeof(req_t), PF_UNSPEC) == ERROR){
+        perror("Receiving coordinate response");
+    }
+
+    return response;
 }
 
-void verify_user(int socket_fd){
-
-    /* Send user to server */
+void verify_user(){
+    
+    /* Send user credentials to server */
     if (send(socket_fd, &session_user, sizeof(ms_user), PF_UNSPEC) == ERROR){
         perror("Sending user credentials");
     }
 
-    /* Recieve response from server */
-    int response;
-    if (recv(socket_fd,&response, sizeof(int), PF_UNSPEC) == ERROR){
+    req_t response;
+    if (recv(socket_fd, &response, sizeof(req_t), PF_UNSPEC) == ERROR){
         perror("Receiving login response");
     }
 
     switch(response){
-        case ACCEPTED:
+        case valid:
             printf("Login successful! Welcome to the server %s!\n", session_user.username);
             break;
-        case REJECTED:
-            printf("Wrong username or password...\nLogin unsuccessful...Disconnecting.\n");
-            shutdown(socket_fd, SHUT_RDWR);
+        case invalid:
+            printf("Wrong username or password...\n");
+            printf("Login unsucessful...Diconnecting.\n");
+            shutdown(socket_fd,SHUT_RDWR);
             close(socket_fd);
-            exit(1);
+            exit(EXIT_FAILURE);
+            break;
+        default:
+            /* This will never happen */
             break;
     }
 
 }
 
 void welcome_screen(){
+
     int cols = 64;
 
     print_line(cols);
@@ -271,10 +310,15 @@ void welcome_screen(){
     printf("\nPlease enter your login details below:\n");
 
     printf("Username: ");
-    scanf("%s", session_user.username);
+    if (fgets(session_user.username, MAX_USERNAME_LEN, stdin)){
+        sscanf(session_user.username,"%s",session_user.username);
+    };
 
     printf("Password: ");
-    scanf("%s", session_user.password);
+    if (fgets(session_user.password, MAX_PASSWORD_LEN, stdin)){
+        sscanf(session_user.password,"%s", session_user.password);
+    }
 
     printf("\n");
+
 }

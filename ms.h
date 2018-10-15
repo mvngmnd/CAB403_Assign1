@@ -1,31 +1,29 @@
-#include <stdbool.h>
-
 #ifndef MS_H_
 #define MS_H_
 
-#define MS_COLS 9 /* Undef behaviour if > 99 */
-#define MS_ROWS 9 /* Undef behaviour if > 99 */
-#define MS_BOMBNO 10
+#include <stdbool.h>
+
+#define MS_COLS 9       /* Size of x axis of a game board. Undef behaviour if > 99 */
+#define MS_ROWS 9       /* Size of y axis of a game board. Undef behaviour if > 99 */
+#define MS_BOMBS 10     /* Number of bombs to be in a single game. Undef behaviour if > MS_COLS*MS_ROWS */
 
 typedef struct {
-    bool revealed;
-    int bomb;
+    bool bomb;
     bool flagged;
+    bool revealed;
     int adjacent;
-} ms_tile;
+} ms_tile_t;
 
-typedef struct{
-    ms_tile board[MS_COLS][MS_ROWS];
-	bool first_turn;
-} ms_game;
+typedef struct {
+    ms_tile_t board[MS_COLS][MS_ROWS];
+    bool first_turn;
+} ms_game_t;
 
-ms_game new_game(int rand_seed);
-
-bool check_win(ms_game *game);
-bool location_is_bomb(ms_game *game, int x, int y);
-bool location_is_valid(ms_game *game, int x, int y);
-void reveal_board(ms_game *game);
-void flag_tile(ms_game *game, int x, int y);
-void reveal_tile(ms_game *game, int x, int y);
+ms_game_t new_game(int rand_seed);
+void reveal_tile(ms_game_t *game, int x, int y);
+void flag_tile(ms_game_t *game, int x, int y);
+bool location_valid(ms_game_t *game, int x, int y);
+bool location_revealed(ms_game_t *game, int x, int y);
+bool location_flagged(ms_game_t *game, int x, int y);
 
 #endif /* MS_H_ */
