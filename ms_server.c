@@ -5,6 +5,10 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <string.h>
+#include <math.h>
+
+#include <signal.h>
 
 #include "ms.h"
 #include "utils.h"
@@ -13,17 +17,43 @@
 typedef struct conn_req conn_req_t;
 struct conn_req{
     int socket_fd;
-    ms_user user;
+    ms_user_t user;
     conn_req_t* next;
 };
+
+/* Pointers for connection requests linked list */
+int conn_reqs_num = 0;
+conn_req_t* conn_reqs = NULL;
+conn_req_t* conn_reqs_last = NULL;
+
+/* Struct of a user history */
+typedef struct ms_user_history ms_user_history_t;
+struct ms_user_history{
+    int won;
+    int lost;
+    ms_user_t user;
+};
+
+typedef struct ms_user_history_entry ms_user_history_entry_t;
+struct ms_user_history_entry{
+    ms_user_history_t user;
+    ms_user_history_entry_t* next;
+};
+
+/* Pointer for user histories linked list */
+ms_user_history_entry_t* user_histories = NULL;
 
 /* Struct of a single scoreboard entry */
 typedef struct scoreboard_entry scoreboard_entry_t;
 struct scoreboard_entry{
     int seconds_taken;
-    ms_user user;
+    ms_user_t user;
     scoreboard_entry_t* next;
 };
+
+/* Pointer for scoreboard entry linked list */
+int scoreboard_entry_num = 0;
+scoreboard_entry_t* scoreboard_entries = NULL;
 
 /* macOS has different mutex initializers */
 #ifdef __APPLE__
@@ -37,35 +67,32 @@ pthread_mutex_t scoreboard_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
 /* Condition to signal unhandled requests waiting */
 pthread_cond_t requests_outstanding = PTHREAD_COND_INITIALIZER;
 
-/* Pointers for connection requests linked list */
-int conn_reqs_num = 0;
-conn_req_t* conn_reqs = NULL;
-conn_req_t* conn_reqs_last = NULL;
-
-/* Pointers for scoreboard entry linked list */
-int scoreboard_entry_num = 0;
-scoreboard_entry_t* scoreboard_entries = NULL;
-scoreboard_entry_t* scoreboard_entries_last = NULL;
-
+/* Socket for the server to listen on */
 int listen_socket_fd;
 
 /* Function definitions */
 
-void add_conn_req(int socket_fd, ms_user user);
+void add_conn_req(int socket_fd, ms_user_t user);
 req_t request_valid(ms_game_t game, coord_req_t request);
 conn_req_t* get_conn_req();
 void handle_conn_req(conn_req_t conn_request);
 void handle_conn_reqs_loop(void* data);
 coord_req_t receive_user_req(int socket_fd);
-req_t verify_user(ms_user user);
+req_t verify_user(ms_user_t user);
+void close_server();
 void close_socket(int socket_fd);
 void send_game(int socket_fd, ms_game_t game);
 void send_response(int socket_fd, req_t response);
+void add_loss(ms_user_t user);
+void add_score(ms_user_t user, int time_taken);
+ms_user_history_entry_t* find_user_history(ms_user_t user);
 
 int main(int argc, char* argv[]){
 
     int i;
     struct sockaddr_in server_addr;
+
+    signal(SIGINT, close_server);
 
     srand(42);
 
@@ -90,7 +117,7 @@ int main(int argc, char* argv[]){
         //Too many args
         default:
             printf("\nUsage --> %s [port]\n\n",argv[0]);
-            exit(1);
+            exit(EXIT_FAILURE);
     }
 
     /* Create socket */
@@ -131,7 +158,7 @@ int main(int argc, char* argv[]){
         socklen_t sin_size = sizeof(struct sockaddr_in);
 
         int user_fd;
-        ms_user user;
+        ms_user_t user;
 
         if ((user_fd = accept(listen_socket_fd, (struct sockaddr *)&client_addr, &sin_size)) == ERROR){
             perror("Accepting message");
@@ -139,7 +166,7 @@ int main(int argc, char* argv[]){
         }
 
         /* Receive credentials */
-        if (recv(user_fd, &user, sizeof(ms_user), PF_UNSPEC) == ERROR){
+        if (recv(user_fd, &user, sizeof(ms_user_t), PF_UNSPEC) == ERROR){
             perror("Receiving user credentials");
         }
 
@@ -156,6 +183,7 @@ int main(int argc, char* argv[]){
                 if (send(user_fd, &response, sizeof(int), PF_UNSPEC) == ERROR){
                     perror("Sending login response");
                 }
+                shutdown(user_fd,SHUT_RDWR);
                 close_socket(user_fd);
                 continue;
             default:
@@ -171,7 +199,7 @@ int main(int argc, char* argv[]){
     return 0;
 }
 
-void add_conn_req(int socket_fd, ms_user user){
+void add_conn_req(int socket_fd, ms_user_t user){
     conn_req_t* request;
 
     request = (conn_req_t*)malloc(sizeof(conn_req_t));
@@ -187,7 +215,7 @@ void add_conn_req(int socket_fd, ms_user user){
     /* Lock request mutex */
     pthread_mutex_lock(&request_mutex);
 
-    if (conn_reqs_num== 0){
+    if (conn_reqs_num == 0){
         conn_reqs = request;
         conn_reqs_last = request;
     } else {
@@ -221,6 +249,7 @@ conn_req_t* get_conn_req(){
         }
 
         conn_reqs_num--;
+
     } else {
         /* The requests list is empty */
         request = NULL;
@@ -249,6 +278,7 @@ void handle_conn_reqs_loop(void* data){
                 printf("%s now playing in Game Room #%d\n", request->user.username, thread_id+1);
                 fflush(0);
                 handle_conn_req(*request);
+                printf("\n%s has left Game Room #%d\n", request->user.username, thread_id+1);
                 free(request);
                 pthread_mutex_lock(&request_mutex);
             }
@@ -265,6 +295,9 @@ void handle_conn_req(conn_req_t conn_request){
     ms_game_t game = new_game(rand());
 
     bool ingame = true;
+    time_t start,end;
+    
+    bool timer_started = false;
 
     while (ingame){
         coord_req_t request = receive_user_req(conn_request.socket_fd);
@@ -272,7 +305,21 @@ void handle_conn_req(conn_req_t conn_request){
             req_t response;
             case reveal:
                 if (request_valid(game, request) == valid){
-                    reveal_tile(&game,request.x,request.y);
+                    req_t reveal_response = reveal_tile(&game,request.x,request.y);
+                    if (reveal_response == lost){
+                        response = lost;
+                        send_response(conn_request.socket_fd,response);
+                        break;
+                    } else if (reveal_response == won){
+                        response = won;
+                        send_response(conn_request.socket_fd, response);
+                        end = time(NULL);
+                        int time_taken = end-start;
+                        add_score(conn_request.user,time_taken);
+                        game = new_game(rand());
+                        timer_started = false;
+                        break;
+                    }
                     response = valid;
                     send_response(conn_request.socket_fd,response);
                 } else {
@@ -291,16 +338,23 @@ void handle_conn_req(conn_req_t conn_request){
                 }
                 break;
             case gameboard:
+                if (!timer_started){
+                    start = time(NULL);
+                    timer_started = true;
+                }
                 send_game(conn_request.socket_fd, game);
                 break;
             case leaderboard:
                 break;
-            case lost:
-                ingame = false;
+            case lost: 
+                timer_started = false;
+                game = new_game(rand());
                 response = valid;
                 send_response(conn_request.socket_fd,response);
+                add_loss(conn_request.user);
                 break;
             case quit:
+                close_socket(conn_request.socket_fd);
                 return;
             default:
                 break;
@@ -390,11 +444,116 @@ coord_req_t receive_user_req(int socket_fd){
     return request;
 }
 
-req_t verify_user(ms_user user){
-    return valid;
+req_t verify_user(ms_user_t user){
+    
+    FILE *auth_file = fopen("Authentication.txt","r");
+    char buffer[256];
+
+    int i = 0;
+
+    if (!auth_file){
+        printf("No authentication file found\n");
+        return invalid;
+    }
+
+    while (fgets(buffer,256, auth_file)!=NULL)
+        /* Dont column headers */
+        if (i==0){
+            i++;
+        } else {
+            char *token = strtok(buffer,"\t\n\r ");
+            /* If the username is correct, then check the password */
+            if (strcmp(user.username,token) == 0){
+                token = strtok(NULL, "\t\n\r ");
+                if (strcmp(user.password,token) == 0){
+                    return valid;
+                }
+            }
+        }	
+
+    return invalid;
+}
+
+void add_loss(ms_user_t user){
+    /* Lock scoreboard mutex */
+    pthread_mutex_lock(&scoreboard_mutex);
+
+    ms_user_history_entry_t* pointer = find_user_history(user);
+    pointer->user.lost++;
+
+    /* Unlock scoreboard mutex */
+    pthread_mutex_unlock(&scoreboard_mutex);
+}
+
+ms_user_history_entry_t* find_user_history(ms_user_t user){
+    ms_user_history_entry_t* pointer = user_histories;
+
+    if (pointer == NULL){
+        pointer = malloc(sizeof(ms_user_history_entry_t));
+        pointer->user.user = user;
+        pointer->user.won = 0;
+        pointer->user.lost = 0;
+        user_histories = pointer;
+        return pointer;
+    }
+
+    for(;pointer!=NULL;pointer=pointer->next){
+        if (strcmp(user.username, pointer->user.user.username) == 0){
+            return pointer;
+        }
+    }
+
+    return NULL;
+}
+
+void add_score(ms_user_t user, int time_taken){
+
+    /* Lock scoreboard mutex */
+    pthread_mutex_lock(&scoreboard_mutex);
+
+    /* Add a win to user history */
+    ms_user_history_entry_t* uh_pointer = find_user_history(user);
+    uh_pointer->user.won++;
+    
+    /* Add time to scoreboard */
+    scoreboard_entry_t* sb_pointer = scoreboard_entries;
+    scoreboard_entry_t* entry = malloc(sizeof(scoreboard_entry_t));
+
+    entry->seconds_taken = time_taken;
+    entry->user = user;
+
+    if (sb_pointer == NULL){
+        scoreboard_entries = entry;
+    } else {
+        for (;sb_pointer!=NULL;sb_pointer = sb_pointer->next){
+            if (sb_pointer->next == NULL){
+                sb_pointer->next = entry;
+            }
+        }
+    }
+
+    /* Unlock scoreboard mutex */
+    pthread_mutex_unlock(&scoreboard_mutex);
+
+    scoreboard_entry_num++;
+    printf("\nTime of %d added\n", time_taken);
+
 }
 
 void close_socket(int socket_fd){
-    shutdown(socket_fd, SHUT_RDWR);
+    shutdown(socket_fd,SHUT_RDWR);
     close(socket_fd);
+}
+
+void close_server(){
+    printf("\nServer is shutting down now...\n");
+    shutdown(listen_socket_fd, SHUT_RDWR);
+    close(listen_socket_fd);
+    exit(EXIT_SUCCESS);
+}
+
+void send_scoreboard(int socket_fd){
+    if (send(socket_fd, &scoreboard_entry_num,sizeof(int),PF_UNSPEC) == ERROR){
+        perror("Sending scoreboard size");
+    }
 }

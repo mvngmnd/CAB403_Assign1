@@ -27,7 +27,7 @@
 typedef struct {
     char username[MAX_USERNAME_LEN];
     char password[MAX_PASSWORD_LEN];
-} ms_user;
+} ms_user_t;
 
 /* Enums for standardized communication */
 typedef enum{

@@ -5,6 +5,8 @@
 
 #include <unistd.h>
 
+#include <signal.h>
+
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -14,11 +16,15 @@
 
 #include <strings.h> //TODO: Remove, with bzero in connect_to_server
 
+//TODO: keep global count of threads used, if == 10 then queue message
+//TODO: Send message if ctrl c so that client quits when server quits
+//TODO: Only allow user to log in once (no concurrent connections for account)
+
 /* Users connection point to server */
 int socket_fd;
 
 /* The current user */
-ms_user session_user;
+ms_user_t session_user;
 
 /* Function definitions */
 void connect_to_server(char* argv[]);
@@ -31,9 +37,12 @@ coord_req_t get_coords();
 void welcome_screen();
 void ms_process();
 
-void game_sig(int* menu_choice);
+void exit_gracefully();
+
 
 int main(int argc, char* argv[]){
+
+    signal(SIGINT, exit_gracefully);
 
     /* If incorrect program usage */
     if (argc != 3){
@@ -60,11 +69,11 @@ int main(int argc, char* argv[]){
                 break;
             /* Show Leaderboard */
             case 2:
-
+                
                 break;
             /* Quit */
             case 3:
-
+                exit_gracefully();
                 break;
         }
     }
@@ -95,14 +104,10 @@ void connect_to_server(char* argv[]){
     bzero(&server_addr.sin_zero,sizeof(server_addr.sin_zero));
 
     if (connect(socket_fd, (struct sockaddr *) &server_addr, sizeof(struct sockaddr_in)) == ERROR){
-        perror("Wrong server details or server is offline! Please try again.");
+        printf("Wrong server details or server is offline! Please try again.\n");
         exit(EXIT_FAILURE);
     }
 
-}
-
-void game_sig(int *choice){
-    choice = 0;
 }
 
 void ms_process(){
@@ -134,9 +139,8 @@ void ms_process(){
                     printf("\n   --> Currently in flag mode");
                     break;
             }
-            
+            printf("\n 0 --> Change mode\n");
         }
-        printf("\n 0 --> Change mode\n");
 
         switch (game_menu_choice){
             request.x = -1; /* Reset request state */
@@ -152,6 +156,17 @@ void ms_process(){
                 }
                 request.request_type = reveal;
                 response = send_request(request);
+                if (response == lost){
+                    recieve_game();
+                    printf("\nYou've hit a bomb! Game over!\n");
+                    request.request_type = lost;
+                    send_request(request);
+                    return;
+                } else if (response == won){
+                    recieve_game();
+                    printf("\nCongratulations %s, you have won!\nYour score has been added to the scoreboard.\n", session_user.username);
+                    return;
+                }
                 break;
             /* Place flag */
             case 2:
@@ -255,15 +270,25 @@ void recieve_game(){
     print_game(cols, rows, values);
 }
 
+void exit_gracefully(){
+    printf("\n");
+    coord_req_t req;
+    req.request_type = quit;
+    send_request(req);
+    shutdown(socket_fd,SHUT_RDWR);
+    close(socket_fd);
+    exit(EXIT_SUCCESS);
+}
+
 req_t send_request(coord_req_t request){
 
     if (send(socket_fd, &request, sizeof(coord_req_t), PF_UNSPEC) == ERROR){
-        perror("Sending coordinate request");
+        perror("Sending request");
     }
 
     req_t response;
     if (recv(socket_fd, &response, sizeof(req_t), PF_UNSPEC) == ERROR){
-        perror("Receiving coordinate response");
+        perror("Receiving response");
     }
 
     return response;
@@ -272,7 +297,7 @@ req_t send_request(coord_req_t request){
 void verify_user(){
     
     /* Send user credentials to server */
-    if (send(socket_fd, &session_user, sizeof(ms_user), PF_UNSPEC) == ERROR){
+    if (send(socket_fd, &session_user, sizeof(ms_user_t), PF_UNSPEC) == ERROR){
         perror("Sending user credentials");
     }
 
@@ -288,9 +313,7 @@ void verify_user(){
         case invalid:
             printf("Wrong username or password...\n");
             printf("Login unsucessful...Diconnecting.\n");
-            shutdown(socket_fd,SHUT_RDWR);
-            close(socket_fd);
-            exit(EXIT_FAILURE);
+            exit_gracefully();
             break;
         default:
             /* This will never happen */

@@ -4,6 +4,7 @@
 #include <stdio.h>
 
 #include "ms.h"
+#include "utils.h"
 
 bool location_bomb(ms_game_t *game, int x, int y){
     return (game->board[x][y].bomb);
@@ -72,12 +73,30 @@ void reveal_board(ms_game_t *game){
     for (y=0;y<MS_ROWS;y++){
         for(x=0;x<MS_COLS;x++){
             game->board[x][y].revealed = true;
+            if (game->board[x][y].flagged){
+                game->board[x][y].flagged = false;
+            }
         }
     }
 }
 
-void reveal_tile(ms_game_t *game, int x, int y){
-    
+bool check_win(ms_game_t *game){
+    int x,y;
+
+    for (y=0;y<MS_ROWS;y++){
+        for (x=0;x<MS_COLS;x++){
+            /* If there is a tile that is not revealed and isnt a bomb, they havent won yet */
+            if (!game->board[x][y].revealed && !game->board[x][y].bomb){
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+req_t reveal_tile(ms_game_t *game, int x, int y){
+
 	if (location_bomb(game,x,y)) {
         if (game->first_turn){                   /* Impossible for a bomb to be hit on first go */
             remove_bomb(game,x,y);
@@ -86,13 +105,14 @@ void reveal_tile(ms_game_t *game, int x, int y){
                     if (place_bomb(game,i,j)){   /* Places the bomb at first possible x location */
                         reveal_tile(game,x,y);
                         game->first_turn = false;
-                        return;
+                        return valid;
                     }
                 }
             }
         }
         
         reveal_board(game); //TODO: ADD LOSE FUNCTIONALITY, have this func return req_t
+        return lost;
 
     } else if (game->board[x][y].adjacent == 0){  /* If blank spot chosen, reveal all nearby blank spots */
         for (int i = x-1; i<=x+1; i++){
@@ -113,6 +133,12 @@ void reveal_tile(ms_game_t *game, int x, int y){
     if (game->first_turn){
         game->first_turn = false;
     }
+
+    if (check_win(game)){
+        return won;
+    }
+
+    return valid;
     
 }
 

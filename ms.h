@@ -2,6 +2,7 @@
 #define MS_H_
 
 #include <stdbool.h>
+#include "utils.h"
 
 #define MS_COLS 9       /* Size of x axis of a game board. Undef behaviour if > 99 */
 #define MS_ROWS 9       /* Size of y axis of a game board. Undef behaviour if > 99 */
@@ -20,7 +21,7 @@ typedef struct {
 } ms_game_t;
 
 ms_game_t new_game(int rand_seed);
-void reveal_tile(ms_game_t *game, int x, int y);
+req_t reveal_tile(ms_game_t *game, int x, int y);
 void flag_tile(ms_game_t *game, int x, int y);
 bool location_valid(ms_game_t *game, int x, int y);
 bool location_revealed(ms_game_t *game, int x, int y);
