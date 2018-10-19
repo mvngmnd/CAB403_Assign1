@@ -26,34 +26,13 @@ int conn_reqs_num = 0;
 conn_req_t* conn_reqs = NULL;
 conn_req_t* conn_reqs_last = NULL;
 
-/* Struct of a user history */
-typedef struct ms_user_history ms_user_history_t;
-struct ms_user_history{
-    int won;
-    int lost;
-    ms_user_t user;
-};
-
-typedef struct ms_user_history_entry ms_user_history_entry_t;
-struct ms_user_history_entry{
-    ms_user_history_t user;
-    ms_user_history_entry_t* next;
-};
-
 /* Pointer for user histories linked list */
 ms_user_history_entry_t* user_histories = NULL;
 
-/* Struct of a single scoreboard entry */
-typedef struct scoreboard_entry scoreboard_entry_t;
-struct scoreboard_entry{
-    int seconds_taken;
-    ms_user_t user;
-    scoreboard_entry_t* next;
-};
-
 /* Pointer for scoreboard entry linked list */
 int scoreboard_entry_num = 0;
-scoreboard_entry_t* scoreboard_entries = NULL;
+scoreboard_entry_t *scoreboard_entries = NULL;
+scoreboard_entry_t *scoreboard_entries_last = NULL;
 
 /* macOS has different mutex initializers */
 #ifdef __APPLE__
@@ -86,6 +65,9 @@ void send_response(int socket_fd, req_t response);
 void add_loss(ms_user_t user);
 void add_score(ms_user_t user, int time_taken);
 ms_user_history_entry_t* find_user_history(ms_user_t user);
+void send_scoreboard(int socket_fd);
+void sort_leaderboard();
+void scoreboard_swap(scoreboard_entry_t *a, scoreboard_entry_t *b);
 
 int main(int argc, char* argv[]){
 
@@ -294,12 +276,14 @@ void handle_conn_req(conn_req_t conn_request){
     /* User information for this session */
     ms_game_t game = new_game(rand());
 
-    bool ingame = true;
+    bool connected = true;
     time_t start,end;
-    
+
     bool timer_started = false;
 
-    while (ingame){
+    add_score(conn_request.user, 20);
+
+    while (connected){
         coord_req_t request = receive_user_req(conn_request.socket_fd);
         switch (request.request_type){
             req_t response;
@@ -344,7 +328,8 @@ void handle_conn_req(conn_req_t conn_request){
                 }
                 send_game(conn_request.socket_fd, game);
                 break;
-            case leaderboard:
+            case scoreboard:
+                send_scoreboard(conn_request.socket_fd);
                 break;
             case lost: 
                 timer_started = false;
@@ -438,9 +423,11 @@ void send_game(int socket_fd, ms_game_t game){
 
 coord_req_t receive_user_req(int socket_fd){
     coord_req_t request;
+
     if (recv(socket_fd, &request, sizeof(coord_req_t),PF_UNSPEC) == ERROR){
         perror("Receiving user coord request");
     }
+
     return request;
 }
 
@@ -501,6 +488,13 @@ ms_user_history_entry_t* find_user_history(ms_user_t user){
         if (strcmp(user.username, pointer->user.user.username) == 0){
             return pointer;
         }
+        if (pointer->next == NULL){
+            pointer->next = malloc(sizeof(ms_user_history_entry_t));
+            pointer->next->user.user = user;
+            pointer->next->user.won = 0;
+            pointer->next->user.lost = 0;
+            return pointer->next;
+        }
     }
 
     return NULL;
@@ -516,21 +510,20 @@ void add_score(ms_user_t user, int time_taken){
     uh_pointer->user.won++;
     
     /* Add time to scoreboard */
-    scoreboard_entry_t* sb_pointer = scoreboard_entries;
     scoreboard_entry_t* entry = malloc(sizeof(scoreboard_entry_t));
 
     entry->seconds_taken = time_taken;
     entry->user = user;
 
-    if (sb_pointer == NULL){
+    if (scoreboard_entry_num== 0){
         scoreboard_entries = entry;
+        scoreboard_entries_last = entry;
     } else {
-        for (;sb_pointer!=NULL;sb_pointer = sb_pointer->next){
-            if (sb_pointer->next == NULL){
-                sb_pointer->next = entry;
-            }
-        }
+        scoreboard_entries_last->next = entry;
+        scoreboard_entries_last = entry;
     }
+
+    sort_leaderboard();
 
     /* Unlock scoreboard mutex */
     pthread_mutex_unlock(&scoreboard_mutex);
@@ -553,7 +546,71 @@ void close_server(){
 }
 
 void send_scoreboard(int socket_fd){
-    if (send(socket_fd, &scoreboard_entry_num,sizeof(int),PF_UNSPEC) == ERROR){
+    
+    int i;
+    scoreboard_entry_t *pointer = scoreboard_entries;
+
+    if (send(socket_fd, &scoreboard_entry_num, sizeof(int), PF_UNSPEC) == ERROR){
         perror("Sending scoreboard size");
     }
+
+    if (scoreboard_entry_num == 0){
+        return;
+    }
+    
+    for (i=0;i<scoreboard_entry_num;i++){
+        if (send(socket_fd, pointer, sizeof(scoreboard_entry_t), PF_UNSPEC) == ERROR){
+            perror("Sending scoreboard entry");
+        }
+        if (send(socket_fd, find_user_history(pointer->user), sizeof(ms_user_history_entry_t), PF_UNSPEC) == ERROR){
+            perror("Receiving scoreboard entry");
+        }
+        pointer = pointer->next;
+    }
+
+}
+
+void scoreboard_swap(scoreboard_entry_t *a, scoreboard_entry_t *b){
+    ms_user_t user_temp = a->user;
+    int time_temp = a->seconds_taken;
+
+    a->user = b->user;
+    a->seconds_taken = b->seconds_taken;
+
+    b->user = user_temp;
+    b->seconds_taken = time_temp;
+}
+
+void sort_leaderboard(){
+
+    int swapped;
+    scoreboard_entry_t* ptr1;
+    scoreboard_entry_t* last = NULL;
+
+    if (scoreboard_entries == NULL){
+        return;
+    }
+
+    do {
+        swapped = 0;
+        ptr1 = scoreboard_entries;
+
+        while (ptr1->next != last){
+            if (ptr1->seconds_taken < ptr1->next->seconds_taken){
+                scoreboard_swap(ptr1, ptr1->next);
+                swapped = 1;
+            } else if (ptr1->seconds_taken == ptr1->next->seconds_taken){
+                if (find_user_history(ptr1->user)->user.won > find_user_history(ptr1->next->user)->user.won){
+                    scoreboard_swap(ptr1, ptr1->next);
+                    swapped = 1;
+                } else if (strcasecmp(ptr1->user.username,ptr1->next->user.username) > 0){
+                    scoreboard_swap(ptr1, ptr1->next);
+                    swapped = 1;
+                }
+            }
+            ptr1 = ptr1->next;
+        }
+        last = ptr1;
+    } while (swapped);
+
 }

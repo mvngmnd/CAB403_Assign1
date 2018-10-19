@@ -31,6 +31,7 @@ void connect_to_server(char* argv[]);
 int get_menu_choice();
 void print_menu(menu_t menu_type);
 void recieve_game();
+void recieve_scoreboard();
 req_t send_request(coord_req_t request);
 void verify_user();
 coord_req_t get_coords();
@@ -69,7 +70,7 @@ int main(int argc, char* argv[]){
                 break;
             /* Show Leaderboard */
             case 2:
-                
+                recieve_scoreboard();
                 break;
             /* Quit */
             case 3:
@@ -268,6 +269,51 @@ void recieve_game(){
     }
 
     print_game(cols, rows, values);
+}
+
+void recieve_scoreboard(){
+
+    int i, scoreboard_size;
+    coord_req_t request;
+    ms_user_history_entry_t historyentry;
+
+    request.request_type = scoreboard;
+
+    scoreboard_entry_t *entry = malloc(sizeof(scoreboard_entry_t));
+
+    if (send(socket_fd, &request, sizeof(coord_req_t), PF_UNSPEC) == ERROR){
+        perror("Sending scoreboard query");
+    }
+    
+    if (recv(socket_fd, &scoreboard_size, sizeof(int), PF_UNSPEC) == ERROR){
+        perror("Recieving scoreboard size");
+    }
+
+    printf("\n");
+    print_line(64);
+    printf("\n");
+
+    if (scoreboard_size == 0){
+        printf("Scoreboard is currently empty!\n\n");
+        print_line(64);
+        fflush(stdout);
+        return;
+    }
+
+    for (i=0;i<scoreboard_size;i++){
+        if (recv(socket_fd, entry, sizeof(scoreboard_entry_t), PF_UNSPEC) == ERROR){
+            perror("Receiving scoreboard entry");
+        }
+        if (recv(socket_fd, &historyentry, sizeof(ms_user_history_entry_t), PF_UNSPEC) == ERROR){
+            perror("Receiving scoreboard entry");
+        }
+        printf("Time of %d seconds by %s.\tUser has won %d of %d games\n", entry->seconds_taken, entry->user.username, historyentry.user.won, historyentry.user.won+historyentry.user.lost);
+        fflush(0);
+    }
+
+    printf("\n");
+    print_line(64);
+
 }
 
 void exit_gracefully(){

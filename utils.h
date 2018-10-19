@@ -32,7 +32,7 @@ typedef struct {
 /* Enums for standardized communication */
 typedef enum{
     gameboard,
-    leaderboard,
+    scoreboard,
     flag,
     reveal,
     quit,
@@ -54,6 +54,28 @@ typedef struct{
     int y;
     req_t request_type;
 } coord_req_t;
+
+/* Struct of a single scoreboard entry */
+typedef struct scoreboard_entry scoreboard_entry_t;
+struct scoreboard_entry{
+    int seconds_taken;
+    ms_user_t user;
+    scoreboard_entry_t* next;
+};
+
+/* Struct of a user history */
+typedef struct ms_user_history ms_user_history_t;
+struct ms_user_history{
+    int won;
+    int lost;
+    ms_user_t user;
+};
+
+typedef struct ms_user_history_entry ms_user_history_entry_t;
+struct ms_user_history_entry{
+    ms_user_history_t user;
+    ms_user_history_entry_t* next;
+};
 
 /****************************************************
  * func: Clear the screen
