@@ -1,24 +1,19 @@
-
-#include <stdbool.h>
-#include <stdlib.h>
-#include <stdio.h>
-
-#include <unistd.h>
-
-#include <signal.h>
-
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <signal.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/socket.h> 
+#include <unistd.h>
 
+/* Utility definitions */
 #include "utils.h"
-
-#include <strings.h> //TODO: Remove, with bzero in connect_to_server
 
 //TODO: keep global count of threads used, if == 10 then queue message
 //TODO: Send message if ctrl c so that client quits when server quits
-//TODO: Only allow user to log in once (no concurrent connections for account)
 
 /* Users connection point to server */
 int socket_fd;
@@ -101,8 +96,8 @@ void connect_to_server(char* argv[]){
     server_addr.sin_addr = *(struct in_addr *)host->h_addr;
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(atoi(argv[2]));
-    //TODO: Below is deprecated
-    bzero(&server_addr.sin_zero,sizeof(server_addr.sin_zero));
+
+    memset(&server_addr.sin_zero, 0, strlen(server_addr.sin_zero));
 
     if (connect(socket_fd, (struct sockaddr *) &server_addr, sizeof(struct sockaddr_in)) == ERROR){
         printf("Wrong server details or server is offline! Please try again.\n");

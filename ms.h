@@ -2,6 +2,8 @@
 #define MS_H_
 
 #include <stdbool.h>
+
+/* Utility definitions */
 #include "utils.h"
 
 #define MS_COLS 9       /* Size of x axis of a game board. Undef behaviour if > 99 */

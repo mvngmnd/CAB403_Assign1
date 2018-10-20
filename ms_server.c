@@ -1,16 +1,16 @@
-
+#include <arpa/inet.h>
+#include <math.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <arpa/inet.h>
 #include <string.h>
-#include <math.h>
+#include <unistd.h>
 
-#include <signal.h>
-
+/* Minesweeper definitions */
 #include "ms.h"
+/* Utility definitions */
 #include "utils.h"
 
 /* Struct of a single connection request */
@@ -20,6 +20,16 @@ struct conn_req{
     ms_user_t user;
     conn_req_t* next;
 };
+
+/* Struct of a user currently logged in */
+typedef struct ms_user_current ms_user_current_t;
+struct ms_user_current{
+    ms_user_t user;
+    ms_user_current_t* next;
+};
+
+/* Pointer for currently logged in users linked lsit */
+ms_user_current_t* current_users = NULL;
 
 /* Pointers for connection requests linked list */
 int conn_reqs_num = 0;
@@ -38,9 +48,13 @@ scoreboard_entry_t *scoreboard_entries_last = NULL;
 #ifdef __APPLE__
 pthread_mutex_t request_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
 pthread_mutex_t scoreboard_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
-#else
+pthread_mutex_t current_users_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
+#endif
+
+#ifdef __linux__
 pthread_mutex_t request_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
 pthread_mutex_t scoreboard_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+pthread_mutex_t current_users_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
 #endif
 
 /* Condition to signal unhandled requests waiting */
@@ -50,7 +64,6 @@ pthread_cond_t requests_outstanding = PTHREAD_COND_INITIALIZER;
 int listen_socket_fd;
 
 /* Function definitions */
-
 void add_conn_req(int socket_fd, ms_user_t user);
 req_t request_valid(ms_game_t game, coord_req_t request);
 conn_req_t* get_conn_req();
@@ -68,6 +81,9 @@ ms_user_history_entry_t* find_user_history(ms_user_t user);
 void send_scoreboard(int socket_fd);
 void sort_leaderboard();
 void scoreboard_swap(scoreboard_entry_t *a, scoreboard_entry_t *b);
+bool user_logged_in(ms_user_t user);
+void user_logout(ms_user_t user);
+void user_login(ms_user_t user);
 
 int main(int argc, char* argv[]){
 
@@ -174,6 +190,7 @@ int main(int argc, char* argv[]){
 
         printf("\nConnection from %s @ %s. ", user.username, inet_ntoa(client_addr.sin_addr));
 
+        user_login(user);
         add_conn_req(user_fd,user);
         printf("Added user to queue.\n");
     }
@@ -261,6 +278,7 @@ void handle_conn_reqs_loop(void* data){
                 fflush(0);
                 handle_conn_req(*request);
                 printf("\n%s has left Game Room #%d\n", request->user.username, thread_id+1);
+                user_logout(request->user);
                 free(request);
                 pthread_mutex_lock(&request_mutex);
             }
@@ -280,8 +298,6 @@ void handle_conn_req(conn_req_t conn_request){
     time_t start,end;
 
     bool timer_started = false;
-
-    add_score(conn_request.user, 20);
 
     while (connected){
         coord_req_t request = receive_user_req(conn_request.socket_fd);
@@ -432,6 +448,10 @@ coord_req_t receive_user_req(int socket_fd){
 }
 
 req_t verify_user(ms_user_t user){
+
+    if (user_logged_in(user)){
+        return invalid;
+    }
     
     FILE *auth_file = fopen("Authentication.txt","r");
     char buffer[256];
@@ -613,4 +633,76 @@ void sort_leaderboard(){
         last = ptr1;
     } while (swapped);
 
+}
+
+bool user_logged_in(ms_user_t user){
+
+    /* Lock current users mutex */
+    pthread_mutex_lock(&current_users_mutex);
+
+    ms_user_current_t *pointer = current_users;
+
+    while (pointer!=NULL){
+        if (strcmp(user.username, pointer->user.username) == 0){
+            /* Lock current users mutex */
+            pthread_mutex_unlock(&current_users_mutex);
+            return true;
+        }
+        pointer = pointer->next;
+    }
+
+    /* Lock current users mutex */
+    pthread_mutex_unlock(&current_users_mutex);
+    return false;
+}
+
+void user_login(ms_user_t user){
+
+    /* Lock current users mutex */
+    pthread_mutex_lock(&current_users_mutex);
+
+    ms_user_current_t *pointer = malloc(sizeof(ms_user_current_t));
+
+    pointer->user = user;
+    pointer->next = current_users;
+
+    current_users = pointer;
+
+    /* Unlock current users mutex */
+    pthread_mutex_unlock(&current_users_mutex);
+
+}
+
+void user_logout(ms_user_t user){
+
+    ms_user_current_t *current = current_users;
+    ms_user_current_t *delete = NULL;
+
+    /* Lock current users mutex */
+    pthread_mutex_lock(&current_users_mutex);
+
+    if (strcmp(current->user.username, user.username) == 0){
+        current_users = current->next;
+        free(current);
+        pthread_mutex_unlock(&current_users_mutex);
+        return;
+    }
+
+    while (current != NULL){
+        if (strcmp(current->next->user.username, user.username) == 0){
+            delete = current->next;
+            if (delete->next == NULL){
+                current->next = NULL;
+            } else {
+                current->next = delete->next;
+            }
+            free(delete);
+            pthread_mutex_unlock(&current_users_mutex);
+            return;
+        }
+        current = current->next;
+    }
+
+    /* Unlock current users mutex */
+    pthread_mutex_unlock(&current_users_mutex);
 }

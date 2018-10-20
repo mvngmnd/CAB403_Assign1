@@ -1,9 +1,10 @@
-
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 
+/* Minesweeper definitions */
 #include "ms.h"
+/* Utility definitions */
 #include "utils.h"
 
 bool location_bomb(ms_game_t *game, int x, int y){

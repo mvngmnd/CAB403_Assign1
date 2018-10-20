@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+/* Utility definitions */
 #include "utils.h"
 
 void clear_screen(){
