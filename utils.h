@@ -8,7 +8,7 @@
 #define ERROR -1
 
  /* Default port if not specified */
-#define DEFAULT_PORT 1588  
+#define DEFAULT_PORT 1901
 
 /* Concurrent connections to be held */
 #define QUEUE_SIZE 10    

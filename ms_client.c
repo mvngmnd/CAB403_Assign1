@@ -13,7 +13,8 @@
 #include "utils.h"
 
 //TODO: keep global count of threads used, if == 10 then queue message
-//TODO: Send message if ctrl c so that client quits when server quits
+//TODO: Send message if ctrl c so that client quits when server quits <- have threads as global?
+//TODO: rand() mutex?
 
 /* Users connection point to server */
 int socket_fd;
@@ -22,19 +23,20 @@ int socket_fd;
 ms_user_t session_user;
 
 /* Function definitions */
-void connect_to_server(char* argv[]);
+coord_req_t get_coords();
+
+req_t send_request(coord_req_t request);
+
 int get_menu_choice();
+
+void connect_to_server(char* argv[]);
+void exit_gracefully();
+void ms_process();
 void print_menu(menu_t menu_type);
 void recieve_game();
 void recieve_scoreboard();
-req_t send_request(coord_req_t request);
 void verify_user();
-coord_req_t get_coords();
 void welcome_screen();
-void ms_process();
-
-void exit_gracefully();
-
 
 int main(int argc, char* argv[]){
 

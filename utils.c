@@ -16,12 +16,13 @@ void print_game(int cols, int rows, int board[cols][rows]){
 
     /* If more than 10 columns, print base-10 indicies on top */
     if (cols>=10){
+        printf("  ");
         for (x=1;x<=cols;x++){
-            if (!x%10==0){
-                printf("  ");
-            } else {
+            if (x%10==0){
                 printf(" %d",x/10);
-            }
+            } else {
+                printf("  ");
+            }    
         }
         printf("\n");
     }
@@ -41,8 +42,14 @@ void print_game(int cols, int rows, int board[cols][rows]){
 
     /* Print y axis */
     for (y=0;y<rows;y++){
-        /* Print y axis coordinates */
-        printf("%d| ",y+1);
+
+        if (y<9 && cols>9){
+            /* Print y axis coordinates */
+            printf(" %d|",y+1);
+        } else {
+            printf("%d|",y+1);
+        }
+    
         for (x=0;x<cols;x++){
             /* Print y axis tile values */
             switch(board[x][y]){

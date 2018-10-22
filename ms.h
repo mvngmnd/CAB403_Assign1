@@ -6,8 +6,8 @@
 /* Utility definitions */
 #include "utils.h"
 
-#define MS_COLS 9       /* Size of x axis of a game board. Undef behaviour if > 99 */
-#define MS_ROWS 9       /* Size of y axis of a game board. Undef behaviour if > 99 */
+#define MS_COLS 15       /* Size of x axis of a game board. Undef behaviour if > 99 */
+#define MS_ROWS 15       /* Size of y axis of a game board. Undef behaviour if > 99 */
 #define MS_BOMBS 10     /* Number of bombs to be in a single game. Undef behaviour if > MS_COLS*MS_ROWS */
 
 typedef struct {

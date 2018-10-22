@@ -60,30 +60,38 @@ pthread_mutex_t current_users_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
 /* Condition to signal unhandled requests waiting */
 pthread_cond_t requests_outstanding = PTHREAD_COND_INITIALIZER;
 
+/* Thread structures */
+pthread_t p_threads[QUEUE_SIZE];
+
 /* Socket for the server to listen on */
 int listen_socket_fd;
 
 /* Function definitions */
 void add_conn_req(int socket_fd, ms_user_t user);
-req_t request_valid(ms_game_t game, coord_req_t request);
-conn_req_t* get_conn_req();
-void handle_conn_req(conn_req_t conn_request);
-void handle_conn_reqs_loop(void* data);
-coord_req_t receive_user_req(int socket_fd);
-req_t verify_user(ms_user_t user);
-void close_server();
-void close_socket(int socket_fd);
-void send_game(int socket_fd, ms_game_t game);
-void send_response(int socket_fd, req_t response);
 void add_loss(ms_user_t user);
 void add_score(ms_user_t user, int time_taken);
-ms_user_history_entry_t* find_user_history(ms_user_t user);
+void close_server();
+void close_socket(int socket_fd);
+void handle_conn_req(conn_req_t conn_request);
+void handle_conn_reqs_loop(void* data);
+void scoreboard_swap(scoreboard_entry_t *a, scoreboard_entry_t *b);
+void send_game(int socket_fd, ms_game_t game);
+void send_response(int socket_fd, req_t response);
 void send_scoreboard(int socket_fd);
 void sort_leaderboard();
-void scoreboard_swap(scoreboard_entry_t *a, scoreboard_entry_t *b);
-bool user_logged_in(ms_user_t user);
-void user_logout(ms_user_t user);
 void user_login(ms_user_t user);
+void user_logout(ms_user_t user);
+
+bool user_logged_in(ms_user_t user);
+
+req_t request_valid(ms_game_t game, coord_req_t request);
+req_t verify_user(ms_user_t user);
+
+conn_req_t* get_conn_req();
+
+coord_req_t receive_user_req(int socket_fd);
+
+ms_user_history_entry_t* find_user_history(ms_user_t user);
 
 int main(int argc, char* argv[]){
 
@@ -96,8 +104,7 @@ int main(int argc, char* argv[]){
 
     /* Thread IDs */
     int thread_ids[QUEUE_SIZE];
-    /* Thread structures */
-    pthread_t p_threads[QUEUE_SIZE];
+    
     /* Thread attributes */
     pthread_attr_t attr;
     pthread_attr_init(&attr);
