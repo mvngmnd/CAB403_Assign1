@@ -78,7 +78,7 @@ struct ms_user_history_entry{
 };
 
 /****************************************************
- * func: Clear the screen
+ * func: Clears the screen
 ****************************************************/
 void clear_screen();
 

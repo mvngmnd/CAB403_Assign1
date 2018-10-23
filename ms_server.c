@@ -49,12 +49,10 @@ scoreboard_entry_t *scoreboard_entries_last = NULL;
 pthread_mutex_t request_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
 pthread_mutex_t scoreboard_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
 pthread_mutex_t current_users_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
-#endif
-
-#ifdef __linux__
-pthread_mutex_t request_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
-pthread_mutex_t scoreboard_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
-pthread_mutex_t current_users_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+#else
+pthread_mutex_t request_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t scoreboard_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t current_users_mutex = PTHREAD_MUTEX_INITIALIZER;
 #endif
 
 /* Condition to signal unhandled requests waiting */
@@ -93,6 +91,10 @@ coord_req_t receive_user_req(int socket_fd);
 
 ms_user_history_entry_t* find_user_history(ms_user_t user);
 
+
+/***********************************************************************
+ * func:            Entry point of the program
+***********************************************************************/
 int main(int argc, char* argv[]){
 
     int i;
@@ -205,6 +207,15 @@ int main(int argc, char* argv[]){
     return 0;
 }
 
+/***********************************************************************
+ * func:            Adds a given connection request to the connections
+ *                  linked list.
+ * 
+ * param socket_fd: The socket file descriptor of the incoming
+ *                  connection request.
+ * 
+ * param user:      The verified user that belongs to the request.
+************************************************************************/
 void add_conn_req(int socket_fd, ms_user_t user){
     conn_req_t* request;
 
@@ -238,6 +249,10 @@ void add_conn_req(int socket_fd, ms_user_t user){
     pthread_cond_signal(&requests_outstanding);
 }
 
+/***********************************************************************
+ * func:            Returns the head of the connection request linked
+ *                  list and removes it from the linked list.
+***********************************************************************/
 conn_req_t* get_conn_req(){
 
     conn_req_t* request;
@@ -268,6 +283,12 @@ conn_req_t* get_conn_req(){
 
 }
 
+/***********************************************************************
+ * func:            A loop function which waits for outstanding
+ *                  requests. If there is an outstanding request, the
+ *                  request will be sent to a handler function.
+ * param data:      The data produced by creating a thread.
+***********************************************************************/
 void handle_conn_reqs_loop(void* data){
 
     int thread_id = *((int *)data);
@@ -296,7 +317,15 @@ void handle_conn_reqs_loop(void* data){
 
 }
 
-void handle_conn_req(conn_req_t conn_request){
+/***********************************************************************
+ * func:            The function to handle a request. It handles client
+ *                  requests, updating its internal game state, and
+ *                  sends the respective response.
+ * param conn_req:  The connection request to handle. This contains
+ *                  the socket information and user information of the
+ *                  request.
+***********************************************************************/
+void handle_conn_req(conn_req_t conn_req){
 
     /* User information for this session */
     ms_game_t game = new_game(rand());
@@ -307,7 +336,7 @@ void handle_conn_req(conn_req_t conn_request){
     bool timer_started = false;
 
     while (connected){
-        coord_req_t request = receive_user_req(conn_request.socket_fd);
+        coord_req_t request = receive_user_req(conn_req.socket_fd);
         switch (request.request_type){
             req_t response;
             case reveal:
@@ -315,33 +344,33 @@ void handle_conn_req(conn_req_t conn_request){
                     req_t reveal_response = reveal_tile(&game,request.x,request.y);
                     if (reveal_response == lost){
                         response = lost;
-                        send_response(conn_request.socket_fd,response);
+                        send_response(conn_req.socket_fd,response);
                         break;
                     } else if (reveal_response == won){
                         response = won;
-                        send_response(conn_request.socket_fd, response);
+                        send_response(conn_req.socket_fd, response);
                         end = time(NULL);
                         int time_taken = end-start;
-                        add_score(conn_request.user,time_taken);
+                        add_score(conn_req.user,time_taken);
                         game = new_game(rand());
                         timer_started = false;
                         break;
                     }
                     response = valid;
-                    send_response(conn_request.socket_fd,response);
+                    send_response(conn_req.socket_fd,response);
                 } else {
                     response = invalid;
-                    send_response(conn_request.socket_fd,response);
+                    send_response(conn_req.socket_fd,response);
                 }
                 break;
             case flag:
                 if (request_valid(game, request) == valid){
                     flag_tile(&game,request.x,request.y);
                     response = valid;
-                    send_response(conn_request.socket_fd,response);
+                    send_response(conn_req.socket_fd,response);
                 } else {
                     response = invalid;
-                    send_response(conn_request.socket_fd,response);
+                    send_response(conn_req.socket_fd,response);
                 }
                 break;
             case gameboard:
@@ -349,20 +378,20 @@ void handle_conn_req(conn_req_t conn_request){
                     start = time(NULL);
                     timer_started = true;
                 }
-                send_game(conn_request.socket_fd, game);
+                send_game(conn_req.socket_fd, game);
                 break;
             case scoreboard:
-                send_scoreboard(conn_request.socket_fd);
+                send_scoreboard(conn_req.socket_fd);
                 break;
             case lost: 
                 timer_started = false;
                 game = new_game(rand());
                 response = valid;
-                send_response(conn_request.socket_fd,response);
-                add_loss(conn_request.user);
+                send_response(conn_req.socket_fd,response);
+                add_loss(conn_req.user);
                 break;
             case quit:
-                close_socket(conn_request.socket_fd);
+                close_socket(conn_req.socket_fd);
                 return;
             default:
                 break;
@@ -371,6 +400,13 @@ void handle_conn_req(conn_req_t conn_request){
     
 }
 
+/***********************************************************************
+ * func:            A function used to validate if a request is valid
+ *                  based on the parameters of the board and its
+ *                  current state.
+ * param game:      The game board state to check.
+ * param request:   The request to validate.
+***********************************************************************/
 req_t request_valid(ms_game_t game, coord_req_t request){
 
     switch (request.request_type){
@@ -399,12 +435,26 @@ req_t request_valid(ms_game_t game, coord_req_t request){
 
 }
 
+/***********************************************************************
+ * func:            A function used to send a response to a given
+ *                  socket connection.
+ * param socket_fd: The socket file descriptor of the desired
+ *                  connection to send to.
+ * param response:  The response to send.
+***********************************************************************/
 void send_response(int socket_fd, req_t response){
     if (send(socket_fd, &response, sizeof(req_t), PF_UNSPEC) == ERROR){
         perror("Sending request response");
     }
 }
 
+/***********************************************************************
+ * func:            A function used to send a game state to a given
+ *                  socket connection.
+ * param socket_fd: The socket file descriptor of the desired
+ *                  connection to send to.
+ * param game:      The game state to send.
+***********************************************************************/
 void send_game(int socket_fd, ms_game_t game){
 
     int cols = MS_COLS;
@@ -444,6 +494,12 @@ void send_game(int socket_fd, ms_game_t game){
 
 }
 
+/***********************************************************************
+ * func:            A function used to recieve and then return a users
+ *                  coordinate request.
+ * param socket_fd: The socket file descriptor of the desired
+ *                  connection to recieve from.
+***********************************************************************/
 coord_req_t receive_user_req(int socket_fd){
     coord_req_t request;
 
@@ -454,6 +510,12 @@ coord_req_t receive_user_req(int socket_fd){
     return request;
 }
 
+/***********************************************************************
+ * func:            A function used to validate a user based on the
+ *                  usernames and passwords stored in the file
+ *                  "Authentication.txt".
+ * param user:      The user to validate.
+***********************************************************************/
 req_t verify_user(ms_user_t user){
 
     if (user_logged_in(user)){
@@ -488,6 +550,11 @@ req_t verify_user(ms_user_t user){
     return invalid;
 }
 
+/***********************************************************************
+ * func:            A function used to add a loss to a given users
+ *                  history.
+ * param user:      The user to add a loss to.
+***********************************************************************/
 void add_loss(ms_user_t user){
     /* Lock scoreboard mutex */
     pthread_mutex_lock(&scoreboard_mutex);
@@ -499,6 +566,12 @@ void add_loss(ms_user_t user){
     pthread_mutex_unlock(&scoreboard_mutex);
 }
 
+
+/***********************************************************************
+ * func:            A function used to find a specified user in the
+ *                  user history linekd list
+ * param user:      
+***********************************************************************/
 ms_user_history_entry_t* find_user_history(ms_user_t user){
     ms_user_history_entry_t* pointer = user_histories;
 

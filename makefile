@@ -6,7 +6,7 @@
 #########################################################
 
 CC = gcc
-CFLAGS = -Wall
+CFLAGS = -Wall -pthread
 
 all: server client
 	rm -f *.o
