@@ -38,6 +38,9 @@ void recieve_scoreboard();
 void verify_user();
 void welcome_screen();
 
+/***********************************************************************
+ * func:            Entry point of the program.
+***********************************************************************/
 int main(int argc, char* argv[]){
 
     signal(SIGINT, exit_gracefully);
@@ -79,6 +82,12 @@ int main(int argc, char* argv[]){
     return 0;
 }
 
+/***********************************************************************
+ * func:            A function used to connect to a given server
+ *                  address.
+ * param argv:      The command line arguments given to the program on
+ *                  launch.
+***********************************************************************/
 void connect_to_server(char* argv[]){
 
     struct hostent *host;
@@ -99,7 +108,8 @@ void connect_to_server(char* argv[]){
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(atoi(argv[2]));
 
-    memset(&server_addr.sin_zero, 0, strlen(server_addr.sin_zero));
+    //TODO: COMMENT THIS BAD BOY
+    memset(&server_addr.sin_zero, 0, sizeof(server_addr.sin_zero)/sizeof(server_addr.sin_zero[0]));
 
     if (connect(socket_fd, (struct sockaddr *) &server_addr, sizeof(struct sockaddr_in)) == ERROR){
         printf("Wrong server details or server is offline! Please try again.\n");
@@ -108,6 +118,12 @@ void connect_to_server(char* argv[]){
 
 }
 
+/***********************************************************************
+ * func:            A function used to represent the minesweeper game
+ *                  process. This is the main process of the client,
+ *                  with it handling all user input, and sending the
+ *                  respective queries and requests to the server.
+***********************************************************************/
 void ms_process(){
     
     int game_menu_choice = 0;
@@ -195,6 +211,10 @@ void ms_process(){
 
 }
 
+/***********************************************************************
+ * func:            A function used to handle user input at the games
+ *                  various menus.
+***********************************************************************/
 int get_menu_choice(){
         char* val = malloc(sizeof(char));
         printf("   --> ");
@@ -203,6 +223,10 @@ int get_menu_choice(){
         return value;
 }
 
+/***********************************************************************
+ * func:            A function used to handle user input when queried
+ *                  for a game location.
+***********************************************************************/
 coord_req_t get_coords(){
         //TODO: take x and y individually
         coord_req_t coord_req;
@@ -213,6 +237,11 @@ coord_req_t get_coords(){
         return coord_req;
 }
 
+/***********************************************************************
+ * func:            A function used to print a given menu type to the
+ *                  screen.
+ * param menu_type: The specified menu type.
+***********************************************************************/
 void print_menu(menu_t menu_type){
 
         printf("\n");
@@ -233,6 +262,10 @@ void print_menu(menu_t menu_type){
 
 }
 
+/***********************************************************************
+ * func:            A function used to recieve the gameboard from the
+ *                  server.
+***********************************************************************/
 void recieve_game(){
     int x,y;
     int cols, rows;
@@ -268,6 +301,10 @@ void recieve_game(){
     print_game(cols, rows, values);
 }
 
+/***********************************************************************
+ * func:            A function used to recieve the scoreboard from the
+ *                  server.
+***********************************************************************/
 void recieve_scoreboard(){
 
     int i, scoreboard_size;
@@ -313,6 +350,10 @@ void recieve_scoreboard(){
 
 }
 
+/***********************************************************************
+ * func:            A function used to gracefully exit the client and
+ *                  properly close the connection with the server.
+***********************************************************************/
 void exit_gracefully(){
     printf("\n");
     coord_req_t req;
@@ -323,6 +364,11 @@ void exit_gracefully(){
     exit(EXIT_SUCCESS);
 }
 
+/***********************************************************************
+ * func:            A function used to send a given request to the
+ *                  server.
+ * param request:   The specified request.
+***********************************************************************/
 req_t send_request(coord_req_t request){
 
     if (send(socket_fd, &request, sizeof(coord_req_t), PF_UNSPEC) == ERROR){
@@ -337,6 +383,9 @@ req_t send_request(coord_req_t request){
     return response;
 }
 
+/***********************************************************************
+ * func:            A function used to verify the user.
+***********************************************************************/
 void verify_user(){
     
     /* Send user credentials to server */
@@ -365,6 +414,10 @@ void verify_user(){
 
 }
 
+/***********************************************************************
+ * func:            A function used to print the welcome screen and
+ *                  query the user for their credentials.
+***********************************************************************/
 void welcome_screen(){
 
     int cols = 64;

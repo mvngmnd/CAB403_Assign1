@@ -93,7 +93,7 @@ ms_user_history_entry_t* find_user_history(ms_user_t user);
 
 
 /***********************************************************************
- * func:            Entry point of the program
+ * func:            Entry point of the program.
 ***********************************************************************/
 int main(int argc, char* argv[]){
 
@@ -569,8 +569,8 @@ void add_loss(ms_user_t user){
 
 /***********************************************************************
  * func:            A function used to find a specified user in the
- *                  user history linekd list
- * param user:      
+ *                  user history linked list.
+ * param user:      The specified user to retrieve.
 ***********************************************************************/
 ms_user_history_entry_t* find_user_history(ms_user_t user){
     ms_user_history_entry_t* pointer = user_histories;
@@ -600,7 +600,13 @@ ms_user_history_entry_t* find_user_history(ms_user_t user){
     return NULL;
 }
 
-void add_score(ms_user_t user, int time_taken){
+/***********************************************************************
+ * func:            A function used to add a score to the servers
+ *                  scoreboard.
+ * param user:      The user associated with the achieved score.
+ * param score:     The time taken to complete the game.
+***********************************************************************/
+void add_score(ms_user_t user, int score){
 
     /* Lock scoreboard mutex */
     pthread_mutex_lock(&scoreboard_mutex);
@@ -612,7 +618,7 @@ void add_score(ms_user_t user, int time_taken){
     /* Add time to scoreboard */
     scoreboard_entry_t* entry = malloc(sizeof(scoreboard_entry_t));
 
-    entry->seconds_taken = time_taken;
+    entry->seconds_taken = score;
     entry->user = user;
 
     if (scoreboard_entry_num== 0){
@@ -633,11 +639,20 @@ void add_score(ms_user_t user, int time_taken){
 
 }
 
+/***********************************************************************
+ * func:            A function used to properly terminate a given
+ *                  socket.
+ * param socket_fd: The socket_fd of the required socket to be 
+ *                  terminated.
+***********************************************************************/
 void close_socket(int socket_fd){
     shutdown(socket_fd,SHUT_RDWR);
     close(socket_fd);
 }
 
+/***********************************************************************
+ * func:            A function used to properly close the server state.
+***********************************************************************/
 void close_server(){
     printf("\nServer is shutting down now...\n");
     shutdown(listen_socket_fd, SHUT_RDWR);
@@ -645,6 +660,12 @@ void close_server(){
     exit(EXIT_SUCCESS);
 }
 
+/***********************************************************************
+ * func:            A function used to send the current scoreboard to
+ *                  a given connection.
+ * param socket_fd: The socket file descriptor of the specified
+ *                  connection.
+***********************************************************************/
 void send_scoreboard(int socket_fd){
     
     int i;
@@ -670,6 +691,12 @@ void send_scoreboard(int socket_fd){
 
 }
 
+/***********************************************************************
+ * func:            A function used to swap two given scoreboard
+ *                  entries in the servers leaderboard state.
+ * param a:         A scoreboard entry to be swapped.
+ * param b:         A scoreboard entry to be swapped.
+***********************************************************************/
 void scoreboard_swap(scoreboard_entry_t *a, scoreboard_entry_t *b){
     ms_user_t user_temp = a->user;
     int time_temp = a->seconds_taken;
@@ -681,6 +708,11 @@ void scoreboard_swap(scoreboard_entry_t *a, scoreboard_entry_t *b){
     b->seconds_taken = time_temp;
 }
 
+/***********************************************************************
+ * func:            A function used to sort the leaderboard, with
+ *                  regards to predefined specifications. This is
+ *                  achieved using a Bubblesort algorithm.
+***********************************************************************/
 void sort_leaderboard(){
 
     int swapped;
@@ -715,6 +747,11 @@ void sort_leaderboard(){
 
 }
 
+/***********************************************************************
+ * func:            A function used to determine whether a given user
+ *                  is currently logged into the server.
+ * param user:      The specified user to check.
+***********************************************************************/
 bool user_logged_in(ms_user_t user){
 
     /* Lock current users mutex */
@@ -736,6 +773,12 @@ bool user_logged_in(ms_user_t user){
     return false;
 }
 
+/***********************************************************************
+ * func:            A function used to log a user into the systems
+ *                  linked list, so that their connection state may be
+ *                  monitored throughout the session.
+ * param user:      The specified user to log in.
+***********************************************************************/
 void user_login(ms_user_t user){
 
     /* Lock current users mutex */
@@ -753,6 +796,11 @@ void user_login(ms_user_t user){
 
 }
 
+/***********************************************************************
+ * func:            A function used to log a user out of the systems
+ *                  connection linked list.
+ * param user:      The specified user to log out.
+***********************************************************************/
 void user_logout(ms_user_t user){
 
     ms_user_current_t *current = current_users;
