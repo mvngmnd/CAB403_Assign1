@@ -67,7 +67,7 @@ int listen_socket_fd;
 /* Function definitions */
 void add_conn_req(int socket_fd, ms_user_t user);
 void add_loss(ms_user_t user);
-void add_score(ms_user_t user, int time_taken);
+void add_score(ms_user_t user, int score);
 void close_server();
 void close_socket(int socket_fd);
 void handle_conn_req(conn_req_t conn_request);
@@ -635,7 +635,7 @@ void add_score(ms_user_t user, int score){
     pthread_mutex_unlock(&scoreboard_mutex);
 
     scoreboard_entry_num++;
-    printf("\nTime of %d added\n", time_taken);
+    printf("\nTime of %d added\n", score);
 
 }
 
