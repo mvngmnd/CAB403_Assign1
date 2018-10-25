@@ -12,6 +12,8 @@
 /* Utility definitions */
 #include "utils.h"
 
+#define _GNU_SOURCE
+
 //TODO: keep global count of threads used, if == 10 then queue message
 //TODO: Send message if ctrl c so that client quits when server quits <- have threads as global?
 //TODO: rand() mutex?
@@ -303,7 +305,7 @@ void recieve_game(){
         perror("Receiving bombs left");
     }
 
-    printf("Bombs remaining: %d\n", ntohs(value));
+    printf("\nBombs remaining: %d\n", ntohs(value));
     
     print_game(cols, rows, values);
 }

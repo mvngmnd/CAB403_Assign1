@@ -13,6 +13,8 @@
 /* Utility definitions */
 #include "utils.h"
 
+#define _GNU_SOURCE
+
 /* Struct of a single connection request */
 typedef struct conn_req conn_req_t;
 struct conn_req{
