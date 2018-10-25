@@ -230,7 +230,7 @@ void add_conn_req(int socket_fd, ms_user_t user){
     request->next = NULL;
 
     /* Lock request mutex */
-    pthread_mutex_lock(&request_mutex);
+    //pthread_mutex_lock(&request_mutex);
 
     if (conn_reqs_num == 0){
         conn_reqs = request;
@@ -243,7 +243,7 @@ void add_conn_req(int socket_fd, ms_user_t user){
     conn_reqs_num++;
 
     /* Unlock request mutex */
-    pthread_mutex_unlock(&request_mutex);
+    //pthread_mutex_unlock(&request_mutex);
 
     /* Signal that there is now a request outstanding */
     pthread_cond_signal(&requests_outstanding);
@@ -487,9 +487,13 @@ void send_game(int socket_fd, ms_game_t game){
 
             if (send(socket_fd, &value, sizeof(uint16_t),PF_UNSPEC) == ERROR){
                 perror("Sending game values");
-                continue;
             };
         }
+    }
+
+    value = htons(bombs_remaining(&game));
+    if (send(socket_fd, &value, sizeof(uint16_t), PF_UNSPEC) == ERROR){
+        perror("Sending bombs remaining");
     }
 
 }

@@ -43,7 +43,7 @@ void print_game(int cols, int rows, int board[cols][rows]){
     /* Print y axis */
     for (y=0;y<rows;y++){
 
-        if (y<9 && cols>9){
+        if ((y<9 && cols>9) || cols<=9){
             /* Print y axis coordinates */
             printf(" %d|",y+1);
         } else {

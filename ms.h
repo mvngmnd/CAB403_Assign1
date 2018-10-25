@@ -27,6 +27,7 @@ req_t reveal_tile(ms_game_t *game, int x, int y);
 void flag_tile(ms_game_t *game, int x, int y);
 bool location_valid(ms_game_t *game, int x, int y);
 bool location_revealed(ms_game_t *game, int x, int y);
+int bombs_remaining(ms_game_t *game);
 bool location_flagged(ms_game_t *game, int x, int y);
 
 #endif /* MS_H_ */

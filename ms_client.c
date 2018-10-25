@@ -298,6 +298,13 @@ void recieve_game(){
         }
     }
 
+    
+    if (recv(socket_fd, &value, sizeof(uint16_t), PF_UNSPEC) == ERROR){
+        perror("Receiving bombs left");
+    }
+
+    printf("Bombs remaining: %d\n", ntohs(value));
+    
     print_game(cols, rows, values);
 }
 

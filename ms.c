@@ -69,8 +69,23 @@ void remove_bomb(ms_game_t *game, int x, int y){
 
 }
 
+int bombs_remaining(ms_game_t *game){
+    int x,y,remaining = 0;
+
+    for (y=0;y<MS_ROWS;y++){
+        for (x=0;x<MS_COLS;x++){
+            if (game->board[x][y].bomb && !game->board[x][y].flagged){
+                remaining++;
+            }
+        }
+    }
+
+    return remaining;
+}
+
 void reveal_board(ms_game_t *game){
     int x, y;
+
     for (y=0;y<MS_ROWS;y++){
         for(x=0;x<MS_COLS;x++){
             game->board[x][y].revealed = true;
@@ -79,6 +94,7 @@ void reveal_board(ms_game_t *game){
             }
         }
     }
+
 }
 
 bool check_win(ms_game_t *game){
