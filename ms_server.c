@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <arpa/inet.h>
 #include <math.h>
 #include <pthread.h>
@@ -12,8 +13,6 @@
 #include "ms.h"
 /* Utility definitions */
 #include "utils.h"
-
-#define _GNU_SOURCE
 
 /* Struct of a single connection request */
 typedef struct conn_req conn_req_t;

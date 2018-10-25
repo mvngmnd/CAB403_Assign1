@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -11,8 +12,6 @@
 
 /* Utility definitions */
 #include "utils.h"
-
-#define _GNU_SOURCE
 
 //TODO: keep global count of threads used, if == 10 then queue message
 //TODO: Send message if ctrl c so that client quits when server quits <- have threads as global?
