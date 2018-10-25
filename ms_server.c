@@ -50,16 +50,18 @@ scoreboard_entry_t *scoreboard_entries_last = NULL;
 pthread_mutex_t request_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
 pthread_mutex_t scoreboard_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
 pthread_mutex_t current_users_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
+pthread_mutex_t rand_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
 #else
 pthread_mutex_t request_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
 pthread_mutex_t scoreboard_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
 pthread_mutex_t current_users_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+pthread_mutex_t rand_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
 #endif
 
 /* Condition to signal unhandled requests waiting */
 pthread_cond_t requests_outstanding = PTHREAD_COND_INITIALIZER;
 
-/* Thread structures */
+/* Thread structures array */
 pthread_t p_threads[QUEUE_SIZE];
 
 /* Socket for the server to listen on */
@@ -201,9 +203,10 @@ int main(int argc, char* argv[]){
         printf("\nConnection from %s @ %s. ", user.username, inet_ntoa(client_addr.sin_addr));
 
         user_login(user);
-        add_conn_req(user_fd,user);
 
         printf("Added user to queue.\n");
+        add_conn_req(user_fd,user);
+
     }
 
     return 0;
@@ -329,8 +332,14 @@ void handle_conn_reqs_loop(void* data){
 ***********************************************************************/
 void handle_conn_req(conn_req_t conn_req){
 
+    /* Lock rand mutex */
+    pthread_mutex_lock(&rand_mutex);
+
     /* User information for this session */
     ms_game_t game = new_game(rand());
+
+    /* Unlock rand mutex */
+    pthread_mutex_unlock(&rand_mutex);
 
     bool connected = true;
     time_t start,end;
@@ -354,7 +363,15 @@ void handle_conn_req(conn_req_t conn_req){
                         end = time(NULL);
                         int time_taken = end-start;
                         add_score(conn_req.user,time_taken);
+
+                        /* Lock rand mutex */
+                        pthread_mutex_lock(&rand_mutex);
+
                         game = new_game(rand());
+
+                        /* Unlock rand mutex */
+                        pthread_mutex_unlock(&rand_mutex);
+                        
                         timer_started = false;
                         break;
                     }
@@ -374,7 +391,15 @@ void handle_conn_req(conn_req_t conn_req){
                         end = time(NULL);
                         int time_taken = end-start;
                         add_score(conn_req.user,time_taken);
+
+                        /* Lock rand mutex */
+                        pthread_mutex_lock(&rand_mutex);
+
                         game = new_game(rand());
+
+                        /* Unlock rand mutex */
+                        pthread_mutex_unlock(&rand_mutex);
+
                         timer_started = false;
                         break;
                     }
@@ -397,7 +422,15 @@ void handle_conn_req(conn_req_t conn_req){
                 break;
             case lost: 
                 timer_started = false;
+
+                /* Lock rand mutex */
+                pthread_mutex_lock(&rand_mutex);
+
                 game = new_game(rand());
+
+                /* Unlock rand mutex */
+                pthread_mutex_unlock(&rand_mutex);
+
                 response = valid;
                 send_response(conn_req.socket_fd,response);
                 add_loss(conn_req.user);
@@ -558,11 +591,13 @@ req_t verify_user(ms_user_t user){
             if (strcmp(user.username,token) == 0){
                 token = strtok(NULL, "\t\n\r ");
                 if (strcmp(user.password,token) == 0){
+                    fclose(auth_file);
                     return valid;
                 }
             }
         }	
 
+    fclose(auth_file);
     return invalid;
 }
 

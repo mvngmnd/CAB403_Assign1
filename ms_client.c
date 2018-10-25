@@ -13,12 +13,11 @@
 /* Utility definitions */
 #include "utils.h"
 
-//TODO: keep global count of threads used, if == 10 then queue message
-//TODO: Send message if ctrl c so that client quits when server quits <- have threads as global?
-//TODO: rand() mutex?
-
 /* Users connection point to server */
-int socket_fd;
+int socket_fd = 0;
+
+/* The width of the screen line seperators printed to the screen */
+int line_width = 64;
 
 /* The current user */
 ms_user_t session_user;
@@ -236,15 +235,18 @@ int get_menu_choice(){
  *                  for a game location.
 ***********************************************************************/
 coord_req_t get_coords(){
-        //TODO: take x and y individually
+
         coord_req_t coord_req;
         coord_req.x = 0;
         coord_req.y = 0;
         printf("X,Y--> ");
         scanf("%d,%d", &coord_req.x, &coord_req.y);
+
+        /* User input is indexed from 1 */
         coord_req.x--;
         coord_req.y--;
         return coord_req;
+
 }
 
 /***********************************************************************
@@ -341,29 +343,31 @@ void recieve_scoreboard(){
     }
 
     printf("\n");
-    print_line(64);
+    print_line(line_width);
     printf("\n");
 
     if (scoreboard_size == 0){
         printf("Scoreboard is currently empty!\n\n");
-        print_line(64);
+        print_line(line_width);
         fflush(stdout);
         return;
     }
 
     for (i=0;i<scoreboard_size;i++){
+        
         if (recv(socket_fd, entry, sizeof(scoreboard_entry_t), PF_UNSPEC) == ERROR){
             perror("Receiving scoreboard entry");
         }
         if (recv(socket_fd, &historyentry, sizeof(ms_user_history_entry_t), PF_UNSPEC) == ERROR){
             perror("Receiving scoreboard entry");
         }
+
         printf("Time of %d seconds by %s.\tUser has won %d of %d games\n", entry->seconds_taken, entry->user.username, historyentry.user.won, historyentry.user.won+historyentry.user.lost);
         fflush(0);
     }
 
     printf("\n");
-    print_line(64);
+    print_line(line_width);
 
 }
 
@@ -372,12 +376,17 @@ void recieve_scoreboard(){
  *                  properly close the connection with the server.
 ***********************************************************************/
 void exit_gracefully(){
+
     printf("\n");
-    coord_req_t req;
-    req.request_type = quit;
-    send_request(req);
-    shutdown(socket_fd,SHUT_RDWR);
-    close(socket_fd);
+
+    if (socket_fd != 0){
+        coord_req_t req;
+        req.request_type = quit;
+        send_request(req);
+        shutdown(socket_fd,SHUT_RDWR);
+        close(socket_fd);
+    }
+    
     exit(EXIT_SUCCESS);
 }
 
@@ -437,11 +446,11 @@ void verify_user(){
 ***********************************************************************/
 void welcome_screen(){
 
-    int cols = 64;
+    
 
-    print_line(cols);
+    print_line(line_width);
     printf("Welcome to the CAB403 online Minesweeper server!\n");
-    print_line(cols);
+    print_line(line_width);
 
     printf("\nPlease enter your login details below:\n");
 

@@ -77,23 +77,26 @@ struct ms_user_history_entry{
     ms_user_history_entry_t* next;
 };
 
-/****************************************************
- * func: Clears the screen
-****************************************************/
+/***********************************************************************
+ * func:            Clears the screen
+***********************************************************************/
 void clear_screen();
 
-/****************************************************
- * func: 
- * param cols:
- * param rows:
- * param board:
-****************************************************/
+/***********************************************************************
+ * func:            Prints a given game state to the screen. The game
+ *                  state given is only a numerical representation of
+ *                  the game.
+ * param cols:      The columns/width of the game board.
+ * param rows:      The rows/height of the game board.
+ * param board:     The integer array containing a numerical
+ *                  representation of the game state.
+***********************************************************************/
 void print_game(int cols, int rows, int board[cols][rows]);
 
-/****************************************************
- * func:
- * param len
-****************************************************/
+/***********************************************************************
+ * func:            Prints a beautiful line on the screen.
+ * param len:       The length of the beautiful line.
+***********************************************************************/
 void print_line(int len);
 
 #endif /* UTILS_H_ */
