@@ -58,6 +58,9 @@ int main(int argc, char* argv[]){
     connect_to_server(argv);
     verify_user();
 
+    //int here for threads in use?
+    //Get valid response here means 
+
     int main_menu_choice = 0;
 
     while (true){
@@ -108,8 +111,6 @@ void connect_to_server(char* argv[]){
     server_addr.sin_addr = *(struct in_addr *)host->h_addr;
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(atoi(argv[2]));
-
-    //TODO: COMMENT THIS BAD BOY
     memset(&server_addr.sin_zero, 0, sizeof(server_addr.sin_zero)/sizeof(server_addr.sin_zero[0]));
 
     if (connect(socket_fd, (struct sockaddr *) &server_addr, sizeof(struct sockaddr_in)) == ERROR){
@@ -158,8 +159,10 @@ void ms_process(){
         }
 
         switch (game_menu_choice){
+
             request.x = -1; /* Reset request state */
             request.y = -1; /* Reset request state */
+
             /* Place tile */
             case 1:
                 request = get_coords();
@@ -194,6 +197,10 @@ void ms_process(){
                 }
                 request.request_type = flag;
                 response = send_request(request);
+                if (response == won){
+                    printf("\nCongratulations %s, you have won!\nYour score has been added to the scoreboard.\n", session_user.username);
+                    return;
+                }
                 break;
             /* Exit */
             case 3:
@@ -231,6 +238,8 @@ int get_menu_choice(){
 coord_req_t get_coords(){
         //TODO: take x and y individually
         coord_req_t coord_req;
+        coord_req.x = 0;
+        coord_req.y = 0;
         printf("X,Y--> ");
         scanf("%d,%d", &coord_req.x, &coord_req.y);
         coord_req.x--;

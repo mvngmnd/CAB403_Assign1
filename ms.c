@@ -12,7 +12,6 @@ bool location_bomb(ms_game_t *game, int x, int y){
 }
 
 bool location_valid(ms_game_t *game, int x, int y){
-    /* Determine that the location is on the board */
     return (x>= 0 && y>=0 && x<MS_COLS && y<MS_ROWS);
 }
 
@@ -22,10 +21,6 @@ bool location_revealed(ms_game_t *game, int x, int y){
 
 bool location_flagged(ms_game_t *game, int x, int y){
     return game->board[x][y].flagged;
-}
-
-void flag_tile(ms_game_t *game, int x, int y){
-    game->board[x][y].flagged = !game->board[x][y].flagged;
 }
 
 bool place_bomb(ms_game_t *game, int x, int y){
@@ -88,10 +83,10 @@ void reveal_board(ms_game_t *game){
 
     for (y=0;y<MS_ROWS;y++){
         for(x=0;x<MS_COLS;x++){
-            game->board[x][y].revealed = true;
             if (game->board[x][y].flagged){
                 game->board[x][y].flagged = false;
             }
+            game->board[x][y].revealed = true;
         }
     }
 
@@ -99,6 +94,11 @@ void reveal_board(ms_game_t *game){
 
 bool check_win(ms_game_t *game){
     int x,y;
+
+    if (bombs_remaining(game) == 0){
+        reveal_board(game);
+        return true;
+    }
 
     for (y=0;y<MS_ROWS;y++){
         for (x=0;x<MS_COLS;x++){
@@ -110,6 +110,19 @@ bool check_win(ms_game_t *game){
     }
 
     return true;
+}
+
+req_t flag_tile(ms_game_t *game, int x, int y){
+
+    game->board[x][y].flagged = !game->board[x][y].flagged;
+
+    if (check_win(game)){
+        reveal_board(game);
+        return won;
+    }
+
+    return valid;
+    
 }
 
 req_t reveal_tile(ms_game_t *game, int x, int y){
@@ -128,7 +141,7 @@ req_t reveal_tile(ms_game_t *game, int x, int y){
             }
         }
         
-        reveal_board(game); //TODO: ADD LOSE FUNCTIONALITY, have this func return req_t
+        reveal_board(game);
         return lost;
 
     } else if (game->board[x][y].adjacent == 0){  /* If blank spot chosen, reveal all nearby blank spots */

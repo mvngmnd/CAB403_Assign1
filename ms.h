@@ -24,7 +24,7 @@ typedef struct {
 
 ms_game_t new_game(int rand_seed);
 req_t reveal_tile(ms_game_t *game, int x, int y);
-void flag_tile(ms_game_t *game, int x, int y);
+req_t flag_tile(ms_game_t *game, int x, int y);
 bool location_valid(ms_game_t *game, int x, int y);
 bool location_revealed(ms_game_t *game, int x, int y);
 int bombs_remaining(ms_game_t *game);

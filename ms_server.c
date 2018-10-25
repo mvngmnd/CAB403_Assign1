@@ -202,6 +202,7 @@ int main(int argc, char* argv[]){
 
         user_login(user);
         add_conn_req(user_fd,user);
+
         printf("Added user to queue.\n");
     }
 
@@ -231,7 +232,7 @@ void add_conn_req(int socket_fd, ms_user_t user){
     request->next = NULL;
 
     /* Lock request mutex */
-    //pthread_mutex_lock(&request_mutex);
+    pthread_mutex_lock(&request_mutex);
 
     if (conn_reqs_num == 0){
         conn_reqs = request;
@@ -244,7 +245,7 @@ void add_conn_req(int socket_fd, ms_user_t user){
     conn_reqs_num++;
 
     /* Unlock request mutex */
-    //pthread_mutex_unlock(&request_mutex);
+    pthread_mutex_unlock(&request_mutex);
 
     /* Signal that there is now a request outstanding */
     pthread_cond_signal(&requests_outstanding);
@@ -366,7 +367,17 @@ void handle_conn_req(conn_req_t conn_req){
                 break;
             case flag:
                 if (request_valid(game, request) == valid){
-                    flag_tile(&game,request.x,request.y);
+                    req_t reveal_response = flag_tile(&game,request.x,request.y);
+                    if (reveal_response == won){
+                        response = won;
+                        send_response(conn_req.socket_fd, response);
+                        end = time(NULL);
+                        int time_taken = end-start;
+                        add_score(conn_req.user,time_taken);
+                        game = new_game(rand());
+                        timer_started = false;
+                        break;
+                    }
                     response = valid;
                     send_response(conn_req.socket_fd,response);
                 } else {
