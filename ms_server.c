@@ -52,9 +52,9 @@ pthread_mutex_t request_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
 pthread_mutex_t scoreboard_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
 pthread_mutex_t current_users_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
 #else
-pthread_mutex_t request_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t scoreboard_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t current_users_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t request_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+pthread_mutex_t scoreboard_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+pthread_mutex_t current_users_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
 #endif
 
 /* Condition to signal unhandled requests waiting */
