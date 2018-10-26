@@ -104,6 +104,7 @@ int main(int argc, char* argv[]){
     struct sockaddr_in server_addr;
 
     signal(SIGINT, close_server);
+    signal(SIGHUP, close_server);
 
     srand(42);
 

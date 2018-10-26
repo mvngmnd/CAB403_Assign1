@@ -44,6 +44,7 @@ void welcome_screen();
 int main(int argc, char* argv[]){
 
     signal(SIGINT, exit_gracefully);
+    signal(SIGHUP, exit_gracefully);
 
     /* If incorrect program usage */
     if (argc != 3){
@@ -56,9 +57,6 @@ int main(int argc, char* argv[]){
     welcome_screen();
     connect_to_server(argv);
     verify_user();
-
-    //int here for threads in use?
-    //Get valid response here means 
 
     int main_menu_choice = 0;
 
@@ -159,9 +157,6 @@ void ms_process(){
 
         switch (game_menu_choice){
 
-            request.x = -1; /* Reset request state */
-            request.y = -1; /* Reset request state */
-
             /* Place tile */
             case 1:
                 request = get_coords();
@@ -180,7 +175,6 @@ void ms_process(){
                     send_request(request);
                     return;
                 } else if (response == won){
-                    recieve_game();
                     printf("\nCongratulations %s, you have won!\nYour score has been added to the scoreboard.\n", session_user.username);
                     return;
                 }
@@ -362,7 +356,7 @@ void recieve_scoreboard(){
             perror("Receiving scoreboard entry");
         }
 
-        printf("Time of %d seconds by %s.\tUser has won %d of %d games\n", entry->seconds_taken, entry->user.username, historyentry.user.won, historyentry.user.won+historyentry.user.lost);
+        printf("Time of %d seconds by %s.\t%s has won %d of %d games\n", entry->seconds_taken, entry->user.username, entry->user.username, historyentry.user.won, historyentry.user.won+historyentry.user.lost);
         fflush(0);
     }
 
