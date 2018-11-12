@@ -1,4 +1,4 @@
-# CAB403_Assign1
+# CAB403_Assign1 - Distributed Minesweeper
 
 To launch the project, download the repository and ensure the `pthreads` library is installed on your system.
 
