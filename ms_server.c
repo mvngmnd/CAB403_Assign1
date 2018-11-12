@@ -583,7 +583,7 @@ req_t verify_user(ms_user_t user){
     }
 
     while (fgets(buffer,256, auth_file)!=NULL)
-        /* Dont column headers */
+        /* Dont read column headers */
         if (i==0){
             i++;
         } else {
@@ -747,7 +747,7 @@ void send_scoreboard(int socket_fd){
  * func:            A function used to swap two given scoreboard
  *                  entries in the servers leaderboard state.
  * param a:         A scoreboard entry to be swapped.
- * param b:         A scoreboard entry to be swapped.
+ * param b:         The other scoreboard entry to be swapped.
 ***********************************************************************/
 void scoreboard_swap(scoreboard_entry_t *a, scoreboard_entry_t *b){
     ms_user_t user_temp = a->user;
@@ -813,14 +813,14 @@ bool user_logged_in(ms_user_t user){
 
     while (pointer!=NULL){
         if (strcmp(user.username, pointer->user.username) == 0){
-            /* Lock current users mutex */
+            /* Unlock current users mutex */
             pthread_mutex_unlock(&current_users_mutex);
             return true;
         }
         pointer = pointer->next;
     }
 
-    /* Lock current users mutex */
+    /* Unlock current users mutex */
     pthread_mutex_unlock(&current_users_mutex);
     return false;
 }
